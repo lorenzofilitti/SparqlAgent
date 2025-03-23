@@ -1,0 +1,10 @@
+sprqlAg_venv/
+
+__pycache__/
+*.py[cod]
+*.so
+
+*.ipynb
+.env
+*.xlxs
+*.log
