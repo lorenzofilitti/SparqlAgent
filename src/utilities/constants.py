@@ -17,6 +17,6 @@ ontolex:sense, lemonEty:etymology, lilacorpora:hasHead, lilacorpora:hasDep, marl
 
 """
 
-NUMBER_SIMILARITY_REULTS = 2
+NUMBER_SIMILARITY_RESULTS = 2
 USER_QUERY_COLLECTION_NAME = "UserQueries"
 SPARQL_QUERY_COLLECTION_NAME = "SparqlQueries"

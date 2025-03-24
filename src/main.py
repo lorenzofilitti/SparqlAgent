@@ -3,7 +3,7 @@ from pydantic_ai import Agent, Tool
 from programs.tools import DB_search, search_similarity
 from utilities.constants import SYSTEM_MESSAGE
 import os
-
+import logfire
 
 def pyagent_chat(
     model: str,
@@ -19,29 +19,32 @@ def pyagent_chat(
     :param model: The name of the LLM.
     :type model: str
     :param system_prompt: The LLM's system prompt.
-    :type system prompt: str
+    :type system_prompt: str
     :param tools: The tools the Agent(LLM) will use.
-    :type tools: Pydantc-ai Tool
+    :type tools: list[Tool]
     :param model_settings: LLM settings.
     :type model_settings: dict
     :param retries: The default number of retries to allow before raising an error.
     :type retries: int
     :param instrument: Use logfire features for tracking Agent actions
-    :type intrument: bool
+    :type instrument: bool
 
     """
-    agent = Agent(
-        model=model,
-        system_prompt=system_prompt,
-        model_settings=model_settings,
-        retries=retries,
-        tools=tools,
-        instrument=instrument,
-    )
+    try:
+        agent = Agent(
+            model=model,
+            system_prompt=system_prompt,
+            model_settings=model_settings,
+            retries=retries,
+            tools=tools,
+            instrument=instrument,
+        )
 
-    configure_page()
-    chat_interface(agent)
-
+        configure_page()
+        chat_interface(agent)
+        
+    except Exception as e:
+        logfire.error(f"An error occurred during while instantiating the agent: {e}")
 
 pyagent_chat(
     model=os.getenv("GPT-MODEL-NAME"),

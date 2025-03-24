@@ -2,11 +2,12 @@ import re
 from dotenv import load_dotenv
 import time
 from SPARQLWrapper import JSON, SPARQLWrapper2
+from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 from pydantic import BaseModel
 import logfire
 import chromadb
 from chromadb.errors import ChromaError
-from utilities.constants import NUMBER_SIMILARITY_REULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME
+from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME
 
 load_dotenv()
 
@@ -31,18 +32,14 @@ def gen(txt):
         time.sleep(0.01)
 
 #------------------------------------------------------------------------------------------
-class SparqlQueryModel(BaseModel):
-    query: str
-    model_config = {"arbitrary_types_allowed": True}
 
-
-def DB_search(query: SparqlQueryModel):
+def DB_search(query: str):
         """
         Use this tool exclusively to send a sparql query and get results 
         from the Lila Knowledge base
         
-        :param sparql_query: a query formatted in sparql language
-        :type sparql_query: str
+        :param query: a query formatted in sparql language
+        :type query: str
 
         :return: Results of the query from the knowledge base in json format
         :rtype: list[dict]
@@ -50,9 +47,9 @@ def DB_search(query: SparqlQueryModel):
         logfire.info(f"Input sparql query of the tool: {query}")
         router = SPARQLWrapper2("https://lila-erc.eu/sparql/lila_knowledge_base/sparql")
         router.setReturnFormat(JSON)
-        router.setQuery(clean_query(query.query))
         
         try:
+            router.setQuery(clean_query(query))
             query_result = router.query()
 
             if query_result.bindings:
@@ -62,15 +59,18 @@ def DB_search(query: SparqlQueryModel):
                         "results": full_result["results"]["bindings"]}
 
             else:
-                logfire.info("No results found")
+                logfire.info("Query was successful but no data was found")
                 return {"status": "success",
-                        "message": "No data found. Query might be incorrect",
+                        "message": "No data found in the database",
                         "results": []}
+            
+        except QueryBadFormed as e:
+            logfire.error(f"Query bad formatted. Error: {e}")
+            return {"status": "error", "error": str(e)}
 
         except Exception as e:
-            logfire.error(f"Sparql query failed. Error: {str(e)}")
-            return {"status": "error",
-                    "error": str(e)}
+            logfire.error(f"Unexpected error occurred. Error: {e}")
+            return {"status": "error", "error": str(e)}
         
 
 def search_similarity(query: str):
@@ -93,7 +93,7 @@ def search_similarity(query: str):
 
         results_1 = u_query_collection.query(
             query_texts=query,
-            n_results=NUMBER_SIMILARITY_REULTS
+            n_results=NUMBER_SIMILARITY_RESULTS
         )
 
         ids_results_1 = results_1["ids"][0]
@@ -101,13 +101,16 @@ def search_similarity(query: str):
         results_2 = s_query_collection.get(
             ids = ids_results_1
         ) 
-        logfire.info(f"Successfully performed semantic search: {results_2["documents"]}")
-        return results_2["documents"]
+        logfire.info(f'Successfully performed semantic search: {results_2["documents"]}')
+        return {"result": "success", "content": results_2.get("documents")}
     
     except ChromaError as e:
         logfire.error(f"An error occurred while performing semantic search: {e}")
+        return {"result": "error", "content": []}
 
-    return []
+    except Exception as e:
+        logfire.error(f"Unexpected error during semantic search. Error: {e}")
+        return {"result": "error", "content": []}
 
 
 
