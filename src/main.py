@@ -5,13 +5,14 @@ from utilities.constants import SYSTEM_MESSAGE
 import os
 
 
-def pyagent_chat(model: str,
-                system_prompt: str,
-                tools: list[Tool],
-                model_settings: dict,
-                retries: int,
-                instrument: bool
-                ):
+def pyagent_chat(
+    model: str,
+    system_prompt: str,
+    tools: list[Tool],
+    model_settings: dict,
+    retries: int,
+    instrument: bool,
+):
     """
     Main function to start the chatbot.
 
@@ -30,22 +31,23 @@ def pyagent_chat(model: str,
 
     """
     agent = Agent(
-                model= model,
-                system_prompt=system_prompt,
-                model_settings=model_settings,
-                retries=retries,
-                tools=tools,
-                instrument=instrument)
-    
+        model=model,
+        system_prompt=system_prompt,
+        model_settings=model_settings,
+        retries=retries,
+        tools=tools,
+        instrument=instrument,
+    )
+
     configure_page()
     chat_interface(agent)
 
 
-pyagent_chat(model=os.getenv("GPT-MODEL-NAME"),
-             system_prompt=SYSTEM_MESSAGE,
-             tools=[Tool(DB_search), Tool(search_similarity)],
-             model_settings={"temperature": 0},
-             retries=1,
-             instrument=True
-             )
-
+pyagent_chat(
+    model=os.getenv("GPT-MODEL-NAME"),
+    system_prompt=SYSTEM_MESSAGE,
+    tools=[Tool(DB_search), Tool(search_similarity)],
+    model_settings={"temperature": 0},
+    retries=1,
+    instrument=True,
+)

@@ -1,7 +1,7 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from tools import gen
+from programs.tools import gen
 from pydantic_ai import Agent
 import logfire
 import os
@@ -11,7 +11,12 @@ logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
 
 
 def configure_page():
-    st.set_page_config(page_title="Lila database chatbot", layout="wide")
+    st.set_page_config(page_title="Lila database chatbot", 
+                       layout="wide", 
+                       initial_sidebar_state="expanded")
+    with st.sidebar:
+        st.markdown("## Useful Links 🔗")
+        st.link_button("Visit the Lila website", url="https://lila-erc.eu/#page-top", icon="👉")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -21,7 +26,7 @@ def configure_page():
 
 
 def chat_interface(agent: Agent):
-    st.title("Lila database chatbot")
+    st.markdown("# Lila Database Chatbot 💬", unsafe_allow_html=True)
     message_container = st.container()
 
     for message in st.session_state.messages:
@@ -47,7 +52,7 @@ def chat_interface(agent: Agent):
                         if not history:
                             response = agent.run_sync(user_query)
                         else:
-                            response = agent.run_sync(user_query, message_history=history[-1]) #il -1 in combo con new messages funziona, da verificare la len di history 
+                            response = agent.run_sync(user_query, message_history=history[-1]) 
 
                         st.write_stream(gen(response.data))
                         st.session_state.Ai_mex_to_markdown += response.data
