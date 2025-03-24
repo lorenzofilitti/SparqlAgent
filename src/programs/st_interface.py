@@ -1,10 +1,13 @@
 import streamlit as st
 from dotenv import load_dotenv
-
+from streamlit_authenticator import Authenticate
 from programs.tools import gen
 from pydantic_ai import Agent
 import logfire
 import os
+import yaml
+from yaml.loader import SafeLoader
+from pathlib import Path
 
 load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
@@ -13,12 +16,19 @@ logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
 
 def configure_page():
     st.set_page_config(page_title="Lila database chatbot", 
-                       layout="wide", 
-                       initial_sidebar_state="expanded")
-    with st.sidebar:
-        st.markdown("## Useful Links 🔗", unsafe_allow_html=True)
-        st.link_button("Visit the Lila website", url="https://lila-erc.eu/#page-top", icon="👉")
+                       layout="centered")
+    
+    with open(Path.cwd()/"config.yaml", "r") as f:
+        config = yaml.load(f, Loader=SafeLoader)
 
+    if "authenticator" not in st.session_state:
+        st.session_state.authenticator = Authenticate(
+            credentials= config["credentials"],
+            cookie_name= config["cookie"]["name"],
+            cookie_key= config["cookie"]["key"],
+            cookie_expiry_days= config["cookie"]["expiry_days"],
+        
+    )
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "Ai_mex_to_markdown" not in st.session_state:
@@ -27,41 +37,63 @@ def configure_page():
 
 
 def chat_interface(agent: Agent):
-    st.markdown("# Lila Database Chatbot 💬", unsafe_allow_html=True)
-    message_container = st.container()
+    configure_page()
 
-    for message in st.session_state.messages:
-        with message_container:
-            with st.chat_message(message["role"]):
-                if message["role"] == "assistant":
-                    st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
-                else:
-                    st.markdown(message["content"], unsafe_allow_html=True)
+    authenticator: Authenticate = st.session_state.authenticator
 
 
-    if user_query := st.chat_input("Ask something"):
-        with message_container:
-            st.chat_message("user").markdown(user_query)
-            st.session_state.messages.append({"role": "user", "content": user_query})
+    if st.session_state.get("authentication_status") is None:
+            if authenticator.login("main"):
+                st.session_state["authentication_status"] = True
 
-            
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
+    elif st.session_state.get("authentication_status") is False:
+        st.error("Username or password is incorrect")
 
-                    try:
-                        history = [msg["content"] for msg in st.session_state.messages if msg["role"] == "assistant"]
-                        if not history:
-                            response = agent.run_sync(user_query)
-                        else:
-                            response = agent.run_sync(user_query, message_history=history[-1]) 
-
-                        st.write_stream(gen(response.data))
-                        st.session_state.Ai_mex_to_markdown.update({"content": response.data})
-                        st.session_state.messages.append({"role": "assistant", "content": response.new_messages()})
+    if st.session_state.get("authentication_status"):
+        st.markdown("# Lila Database Chatbot 💬", unsafe_allow_html=True)
+        with st.sidebar:
+            authenticator.logout(location="sidebar")
+            st.markdown("## Useful Links 🔗", unsafe_allow_html=True)
+            st.link_button("Visit the Lila website", url="https://lila-erc.eu/#page-top", icon="👉")
 
         
-                    except Exception as e:
-                        logfire.error(f"An error occurred during the chat: {e}")
-                        st.error(f"An error occurred during the chat: {e}")
 
+        message_container = st.container()
+
+        for message in st.session_state.messages:
+            with message_container:
+                with st.chat_message(message["role"]):
+                    if message["role"] == "assistant":
+                        st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
+                    else:
+                        st.markdown(message["content"], unsafe_allow_html=True)
+
+
+        if user_query := st.chat_input("Ask something"):
+            with message_container:
+                st.chat_message("user").markdown(user_query)
+                st.session_state.messages.append({"role": "user", "content": user_query})
+
+                
+                with st.chat_message("assistant"):
+                    with st.spinner("Thinking..."):
+
+                        try:
+                            history = [msg["content"] for msg in st.session_state.messages if msg["role"] == "assistant"]
+                            if not history:
+                                response = agent.run_sync(user_query)
+                            else:
+                                response = agent.run_sync(user_query, message_history=history[-1]) 
+
+                            st.write_stream(gen(response.data))
+                            st.session_state.Ai_mex_to_markdown.update({"content": response.data})
+                            st.session_state.messages.append({"role": "assistant", "content": response.new_messages()})
+
+            
+                        except Exception as e:
+                            logfire.error(f"An error occurred during the chat: {e}")
+                            st.error(f"An error occurred during the chat: {e}")
+
+
+  
                         

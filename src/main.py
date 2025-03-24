@@ -39,8 +39,6 @@ def pyagent_chat(
             tools=tools,
             instrument=instrument,
         )
-
-        configure_page()
         chat_interface(agent)
         
     except Exception as e:
