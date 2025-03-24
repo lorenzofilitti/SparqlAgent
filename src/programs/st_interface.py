@@ -10,18 +10,19 @@ load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
 
 
+
 def configure_page():
     st.set_page_config(page_title="Lila database chatbot", 
                        layout="wide", 
                        initial_sidebar_state="expanded")
     with st.sidebar:
-        st.markdown("## Useful Links 🔗")
+        st.markdown("## Useful Links 🔗", unsafe_allow_html=True)
         st.link_button("Visit the Lila website", url="https://lila-erc.eu/#page-top", icon="👉")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "Ai_mex_to_markdown" not in st.session_state:
-        st.session_state.Ai_mex_to_markdown = ""
+        st.session_state.Ai_mex_to_markdown = {}
     logfire.info("Page setup successfully")
 
 
@@ -33,7 +34,7 @@ def chat_interface(agent: Agent):
         with message_container:
             with st.chat_message(message["role"]):
                 if message["role"] == "assistant":
-                    st.markdown(st.session_state.Ai_mex_to_markdown, unsafe_allow_html=True)
+                    st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
                 else:
                     st.markdown(message["content"], unsafe_allow_html=True)
 
@@ -48,19 +49,19 @@ def chat_interface(agent: Agent):
                 with st.spinner("Thinking..."):
 
                     try:
-                        history = [message["content"] for message in st.session_state.messages if message["role"] == "assistant"]
+                        history = [msg["content"] for msg in st.session_state.messages if msg["role"] == "assistant"]
                         if not history:
                             response = agent.run_sync(user_query)
                         else:
                             response = agent.run_sync(user_query, message_history=history[-1]) 
 
                         st.write_stream(gen(response.data))
-                        st.session_state.Ai_mex_to_markdown += response.data
-                        st.session_state.messages.append({"role": "assistant", "content": response.new_messages()}) 
+                        st.session_state.Ai_mex_to_markdown.update({"content": response.data})
+                        st.session_state.messages.append({"role": "assistant", "content": response.new_messages()})
+
         
                     except Exception as e:
-                        error_message = e
-                        logfire.error(f"An error occurred during the chat: {error_message}")
-                        st.error(f"An error occurred during the chat: {error_message}")
+                        logfire.error(f"An error occurred during the chat: {e}")
+                        st.error(f"An error occurred during the chat: {e}")
 
                         
