@@ -1,9 +1,12 @@
-from programs.st_interface import configure_page, chat_interface
+from programs.st_interface import chat_interface
 from pydantic_ai import Agent, Tool
 from programs.tools import DB_search, search_similarity
 from utilities.constants import SYSTEM_MESSAGE
 import os
 import logfire
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def pyagent_chat(
     model: str,
@@ -39,10 +42,11 @@ def pyagent_chat(
             tools=tools,
             instrument=instrument,
         )
+
         chat_interface(agent)
         
     except Exception as e:
-        logfire.error(f"An error occurred during while instantiating the agent: {e}")
+        logfire.error(f"An error occurred while instantiating the agent: {e}")
 
 pyagent_chat(
     model=os.getenv("GPT-MODEL-NAME"),

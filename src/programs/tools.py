@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import time
 from SPARQLWrapper import JSON, SPARQLWrapper2
 from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
-from pydantic import BaseModel
 import logfire
 import chromadb
 from chromadb.errors import ChromaError
