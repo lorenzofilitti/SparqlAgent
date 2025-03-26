@@ -13,16 +13,21 @@ load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
 
 
+def load_config():
+    with open(Path.cwd()/"config.yaml", "r") as f:
+        config = yaml.load(f, Loader=SafeLoader)
+    return config
 
 
 def configure_page():
+    config = load_config()
     try:
-        st.set_page_config(page_title="Lila database chatbot", 
-                        layout="centered")
+        st.set_page_config(
+            page_title="Lila database chatbot", 
+            layout="centered",
+            initial_sidebar_state="collapsed"
+            )
         
-        with open(Path.cwd()/"config.yaml", "r") as f:
-            config = yaml.load(f, Loader=SafeLoader)
-
         if "authenticator" not in st.session_state:
             st.session_state.authenticator = Authenticate(
                 credentials= config["credentials"],
@@ -33,8 +38,8 @@ def configure_page():
         )
         if "messages" not in st.session_state:
             st.session_state.messages = []
-        if "Ai_mex_to_markdown" not in st.session_state:
-            st.session_state.Ai_mex_to_markdown = {}
+        if "memory" not in st.session_state:
+            st.session_state.memory = {}
 
     except Exception as e:
         logfire.error(f"Error during page configuration: {e}")
@@ -55,51 +60,36 @@ def chat_interface(agent: Agent):
     elif st.session_state.get("authentication_status"):
         logfire.info("User logged in")
         authenticator.logout(location="sidebar")
-        # with open(Path.cwd()/"config.yaml", 'w') as file:
-        #     yaml.dump(config, file, default_flow_style=False, allow_unicode=True)
         
         st.markdown("# Lila Database Chatbot 💬", unsafe_allow_html=True)  
-    
-        message_container = st.container()
 
         for message in st.session_state.messages:
-            with message_container:
-                if message["role"] == "user":
-                    with st.chat_message("user"):
-                        st.markdown(message["content"], unsafe_allow_html=True)
-                elif st.session_state.Ai_mex_to_markdown["content"]:
-                    with st.chat_message("assistant"):    
-                        st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
-            
-
-
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+          
         if user_query := st.chat_input("Ask something"):
-            with message_container:
-                st.chat_message("user").markdown(user_query)
-                st.session_state.messages.append({"role": "user", "content": user_query})
-
-                
-                with st.chat_message("assistant"):
-                    with st.spinner("Thinking..."):
-
-                        try:
-                            history = [msg["content"] for msg in st.session_state.messages if msg["role"] == "assistant"]
-                            logfire.info(f"Chat history length: {len(history)}")
-                            if not history:
-                                response = agent.run_sync(user_query)
-                            else:
-                                response = agent.run_sync(user_query, message_history=history[-1]) 
-
-                            st.write_stream(gen(response.data))
-                            st.session_state.Ai_mex_to_markdown.update({"content": response.data})
-                            st.session_state.messages[0].update({"role": "assistant", "content": response.new_messages()})
-
-                            
+            st.session_state.messages.append({"role": "user", "content": user_query})
+            st.chat_message("user").markdown(user_query)
             
-                        except Exception as e:
-                            logfire.error(f"An error occurred during the chat: {e}")
-                            st.error(f"An error occurred during the chat: {e}")
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+
+                    try:
+                        history = st.session_state.memory.get("content")
+                        logfire.info(f"Chat history length: {history}")
+                        if not history:
+                            response = agent.run_sync(user_query)
+                        else:
+                            response = agent.run_sync(user_query, message_history=history) 
+
+                        st.write_stream(gen(response.data))
+                        
+                        st.session_state.memory.update({"content": response.new_messages()})
+                        st.session_state.messages.append({"role": "assistant", "content": response.data})
+
+                    except Exception as e:
+                        logfire.error(f"An error occurred during the chat: {e}")
+                        st.error(f"An error occurred during the chat: {e}")
 
 
   
-                        
