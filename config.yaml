@@ -1,0 +1,13 @@
+cookie:
+  expiry_days: 1
+  key: auth_key
+  name: cookie_name
+credentials:
+  usernames:
+    lorenzofilitti:
+      email: lorenzo@agent.com
+      failed_login_attempts: 0
+      name: lorenzofilitti
+      password: $2b$12$9/uNLyy6aWYsAK5N8hFPsOP77CXHUxvDMyNzK6PWkItZ7IZV.PEHe
+pre-authorized:
+  emails: null

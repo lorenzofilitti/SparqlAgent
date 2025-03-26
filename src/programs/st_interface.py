@@ -5,7 +5,6 @@ from programs.tools import gen
 from pydantic_ai import Agent
 import logfire
 import os
-import json
 import yaml
 from yaml.loader import SafeLoader
 from pathlib import Path
@@ -94,9 +93,3 @@ def chat_interface(agent: Agent):
 
 
   
-def plot_query():
-    with open(Path.cwd()/"args.json", "r") as f:
-        args = json.load(f)
-    with st.sidebar:
-        st.markdown("## Sparql query used")
-        st.code(args.get("args")[0], language="sparql", wrap_lines=True)
