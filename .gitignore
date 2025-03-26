@@ -172,3 +172,4 @@ sprqlAg_venv/
 .vscode/
 *env/
 chroma_data/
+*.yaml
