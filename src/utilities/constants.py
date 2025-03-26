@@ -15,10 +15,10 @@ Properties:powla:hasLayer, powla:hasDocument, powla:hasSubDocument, powla:hasStr
 dcterms:creator, dcterms:title, rdf:type, rdfs:label, rdfs:subClassOf, lime:entry, ontolex:canonicalForm, ontolex:writtenRep,
 ontolex:sense, lemonEty:etymology, lilacorpora:hasHead, lilacorpora:hasDep, marl:hasPolarity.
 
-If you answer after having retrieved data from the database, make sure to display the sparql query you have used at the end
-of your answer.
-"""
 
+"""
+# If you answer after having retrieved data from the database, make sure to display the sparql query you have used at the end
+# of your answer.
 NUMBER_SIMILARITY_RESULTS = 2
 USER_QUERY_COLLECTION_NAME = "UserQueries"
 SPARQL_QUERY_COLLECTION_NAME = "SparqlQueries"

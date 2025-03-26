@@ -1,4 +1,4 @@
-from programs.st_interface import chat_interface
+from programs.st_interface import chat_interface, plot_query
 from pydantic_ai import Agent, Tool
 from programs.tools import DB_search, search_similarity
 from utilities.constants import SYSTEM_MESSAGE
@@ -44,6 +44,7 @@ def pyagent_chat(
         )
 
         chat_interface(agent)
+        plot_query()
         
     except Exception as e:
         logfire.error(f"An error occurred while instantiating the agent: {e}")

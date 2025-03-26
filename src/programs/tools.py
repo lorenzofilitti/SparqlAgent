@@ -8,6 +8,7 @@ import chromadb
 from chromadb.errors import ChromaError
 from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME
 from typing import Dict, List
+import json
 
 load_dotenv()
 
@@ -33,6 +34,16 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
+def take_args(func):
+    def wrapper(*args: str):
+        dizio = {"args": args}
+        with open("args.json", "w") as f:
+            json.dump(dizio, f, indent=4)
+        return func(*args)
+    return wrapper
+#------------------------------------------------------------------------------------------
+
+@take_args
 def DB_search(query: str) -> List[Dict[str, str]]:
         """
         Use this tool exclusively to send a sparql query and get results 
