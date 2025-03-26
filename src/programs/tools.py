@@ -7,6 +7,7 @@ import logfire
 import chromadb
 from chromadb.errors import ChromaError
 from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME
+from typing import Dict, List
 
 load_dotenv()
 
@@ -32,7 +33,7 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
-def DB_search(query: str):
+def DB_search(query: str) -> List[Dict[str, str]]:
         """
         Use this tool exclusively to send a sparql query and get results 
         from the Lila Knowledge base

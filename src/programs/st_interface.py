@@ -35,7 +35,7 @@ def configure_page():
             st.session_state.messages = []
         if "Ai_mex_to_markdown" not in st.session_state:
             st.session_state.Ai_mex_to_markdown = {}
-            
+
     except Exception as e:
         logfire.error(f"Error during page configuration: {e}")
 
@@ -64,11 +64,13 @@ def chat_interface(agent: Agent):
 
         for message in st.session_state.messages:
             with message_container:
-                with st.chat_message(message["role"]):
-                    if message["role"] == "assistant":
-                        st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
-                    else:
+                if message["role"] == "user":
+                    with st.chat_message("user"):
                         st.markdown(message["content"], unsafe_allow_html=True)
+                elif st.session_state.Ai_mex_to_markdown["content"]:
+                    with st.chat_message("assistant"):    
+                        st.markdown(st.session_state.Ai_mex_to_markdown["content"], unsafe_allow_html=True)
+            
 
 
         if user_query := st.chat_input("Ask something"):
@@ -90,8 +92,9 @@ def chat_interface(agent: Agent):
 
                             st.write_stream(gen(response.data))
                             st.session_state.Ai_mex_to_markdown.update({"content": response.data})
-                            st.session_state.messages[1].update({"role": "assistant", "content": response.new_messages()})
+                            st.session_state.messages[0].update({"role": "assistant", "content": response.new_messages()})
 
+                            
             
                         except Exception as e:
                             logfire.error(f"An error occurred during the chat: {e}")
