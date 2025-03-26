@@ -171,3 +171,4 @@ cython_debug/
 sprqlAg_venv/
 .vscode/
 *env/
+chroma_data/
