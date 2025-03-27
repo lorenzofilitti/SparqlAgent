@@ -22,3 +22,5 @@ of your answer.
 NUMBER_SIMILARITY_RESULTS = 2
 USER_QUERY_COLLECTION_NAME = "UserQueries"
 SPARQL_QUERY_COLLECTION_NAME = "SparqlQueries"
+
+LILA_ENDPOINT = "https://lila-erc.eu/sparql/lila_knowledge_base/sparql"
