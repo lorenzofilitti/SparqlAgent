@@ -21,7 +21,7 @@ def pyagent_chat(
     """
     Main function to start the chatbot.
 
-    :param model: The name of the LLM. One of...
+    :param model: The name of the LLM. One of the models mentioned in the PydanticAI documentation.
     :type model: str
     :param system_prompt: The LLM's system prompt.
     :type system_prompt: str
