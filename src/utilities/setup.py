@@ -42,13 +42,15 @@ def add_entries(model: str):
         
         with open(path_dotfile, mode='w') as f:
             api_key = input(f'Enter your {model_name} API key')
-            f.write(f'OPENAI_API_KEY={api_key}')
+            f.write(f"""OPENAI_API_KEY={api_key}
+GPT-MODEL-NAME={model}""")
 
     elif 'gemini' in model_name:
 
         with open(path_dotfile, mode='w') as f:
             api_key = input(f'Enter your {model_name} API key')
-            f.write(f'GEMINI_API_KEY={api_key}')
+            f.write(f"""GEMINI_API_KEY={api_key}
+GPT-MODEL-NAME={model}""")
 
 def setup_config():
 
@@ -91,6 +93,7 @@ def main():
         create_env()
         logger.info("Adding required environment variables now...")
 
+        #! make this dropdown menu
         model = input('name of the model (e.g.; google-gla:gemini-2.0-flash, gpt-4o): ')
 
         add_entries(model=model)
