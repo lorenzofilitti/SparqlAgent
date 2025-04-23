@@ -53,6 +53,6 @@ pyagent_chat(
     system_prompt=SYSTEM_MESSAGE,
     tools=[Tool(DB_search), Tool(search_similarity)],
     model_settings={"temperature": 0},
-    retries=1,
+    retries=3,
     instrument=True,
 )

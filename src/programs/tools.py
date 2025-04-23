@@ -6,9 +6,9 @@ from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 import logfire
 import chromadb
 from chromadb.errors import ChromaError
-from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME
+from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME, LILA_ENDPOINT
 from typing import Dict, List
-import json
+from pydantic_ai.exceptions import ModelRetry
 
 load_dotenv()
 
@@ -34,16 +34,6 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
-def take_args(func):
-    def wrapper(*args: str):
-        dizio = {"args": args}
-        with open("args.json", "w") as f:
-            json.dump(dizio, f, indent=4)
-        return func(*args)
-    return wrapper
-#------------------------------------------------------------------------------------------
-
-@take_args
 def DB_search(query: str) -> List[Dict[str, str]]:
         """
         Use this tool exclusively to send a sparql query and get results 
@@ -56,7 +46,7 @@ def DB_search(query: str) -> List[Dict[str, str]]:
         :rtype: list[dict]
         """
         logfire.info(f"Input sparql query of the tool: {query}")
-        router = SPARQLWrapper2("https://lila-erc.eu/sparql/lila_knowledge_base/sparql")
+        router = SPARQLWrapper2(LILA_ENDPOINT)
         router.setReturnFormat(JSON)
         
         try:
@@ -77,7 +67,7 @@ def DB_search(query: str) -> List[Dict[str, str]]:
             
         except QueryBadFormed as e:
             logfire.error(f"Query bad formatted. Error: {e}")
-            return {"status": "error", "error": str(e)}
+            raise ModelRetry({"status": "error", "error": str(e)}) 
 
         except Exception as e:
             logfire.error(f"Unexpected error occurred. Error: {e}")

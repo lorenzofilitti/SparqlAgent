@@ -1,5 +1,7 @@
 {
     "args": [
-        "SELECT ?doc ?title WHERE {?doc a powla:Document ; dc:title ?title } ORDER BY ?title LIMIT 5"
+        "select ?doc ?title where{   ?doc a powla:Corpus;       dc:title ?title. }"
+    ]
+}by ?title"
     ]
 }
