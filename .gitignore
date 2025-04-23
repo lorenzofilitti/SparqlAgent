@@ -173,3 +173,5 @@ sprqlAg_venv/
 *env/
 chroma_data/
 *.yaml
+
+.logfire

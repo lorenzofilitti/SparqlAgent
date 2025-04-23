@@ -5,8 +5,10 @@ from utilities.constants import SYSTEM_MESSAGE
 import os
 import logfire
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+dotenv_path = Path('../.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 def pyagent_chat(
     model: str,
@@ -19,7 +21,7 @@ def pyagent_chat(
     """
     Main function to start the chatbot.
 
-    :param model: The name of the LLM.
+    :param model: The name of the LLM. One of the models mentioned in the PydanticAI documentation.
     :type model: str
     :param system_prompt: The LLM's system prompt.
     :type system_prompt: str
@@ -47,6 +49,7 @@ def pyagent_chat(
         
     except Exception as e:
         logfire.error(f"An error occurred while instantiating the agent: {e}")
+
 
 pyagent_chat(
     model=os.getenv("GPT-MODEL-NAME"),
