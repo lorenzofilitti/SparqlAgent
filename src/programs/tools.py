@@ -9,7 +9,7 @@ from chromadb.errors import ChromaError
 from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME, LILA_ENDPOINT
 from typing import Dict, List
 from pydantic_ai.exceptions import ModelRetry
-
+import json
 load_dotenv()
 
 #------------------------------------------------------------------------------------------
@@ -114,4 +114,30 @@ def search_similarity(query: str):
         return {"result": "error", "content": []}
 
 
+#--------------------------------------------------------------------
 
+def get_affixes(label: str, type: str):
+    """
+    tool to get affixes' named individuals to build sparql queries on affixes. Specify the label (the prefix or suffix) and the type of affix requested by the user (prefix or suffix)
+
+    :param label: the prefix or suffix
+    :type label: str
+
+    :param type: a string indicating whether to look for a prefix or suffix
+    :type type: str
+    """
+    try:
+        with open("prefixes.json", "r") as f:
+            prefixes = json.load(f)
+        with open("suffixes.json", "r") as f:
+            suffixes = json.load(f)
+        
+        if type.lower() == "prefix":
+            result = prefixes.get(label)
+        elif type.lower() == "suffix":
+            result = suffixes.get(label)
+    except Exception as e:
+        logfire.error(f"Exception caught in the get_affixes tool: {e}")
+    
+    logfire.info(f"Affixes tool result: {result}")
+    return result
