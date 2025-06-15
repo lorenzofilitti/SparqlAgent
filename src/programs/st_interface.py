@@ -61,7 +61,7 @@ def chat_interface(agent: Agent):
         logfire.info("User logged in")
         authenticator.logout(location="sidebar")
         
-        st.markdown("# Lila Database Chatbot 💬", unsafe_allow_html=True)  
+        st.markdown("# LiLa Database Chatbot 🤖", unsafe_allow_html=True)  
 
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
