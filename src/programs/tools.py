@@ -6,10 +6,15 @@ from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 import logfire
 import chromadb
 from chromadb.errors import ChromaError
-from utilities.constants import NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME, LILA_ENDPOINT
+from src.programs.async_wikidata import wikidata_async_search, lila_async_search
+from src.utilities.constants import (
+    NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME, LILA_ENDPOINT
+    )
 from typing import Dict, List
 from pydantic_ai.exceptions import ModelRetry
+from pydantic import BaseModel
 import json
+import asyncio
 load_dotenv()
 
 #------------------------------------------------------------------------------------------
@@ -34,7 +39,7 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
-def DB_search(query: str) -> List[Dict[str, str]]:
+async def DB_search(query: str) -> List[Dict[str, str]]:
         """
         Use this tool exclusively to send a sparql query and get results 
         from the Lila Knowledge base
@@ -55,9 +60,36 @@ def DB_search(query: str) -> List[Dict[str, str]]:
 
             if query_result.bindings:
                 logfire.info("Found results from the lila db")
+
                 full_result = query_result.fullResult
-                return {"status": "success",
-                        "results": full_result["results"]["bindings"]}
+                bindings = full_result["results"]["bindings"]
+
+                logfire.info("Extracting uris...")
+                wiki_pattern = re.compile(r"https?://www\.wikidata.*?\'")
+                lila_pattern = re.compile(r"https?://lila-erc\.eu.*?\'")
+
+                wikidata_uris = wiki_pattern.findall(str(bindings))
+                lila_uris = lila_pattern.findall(str(bindings))
+                clean_wiki_uris = [re.sub("'", "", uri) for uri in wikidata_uris]
+                clean_lila_uris = [re.sub("'", "", uri) for uri in lila_uris]
+
+                logfire.info("Searching Wikidata and LiLa...")
+                wikidata_result = await asyncio.gather(*[wikidata_async_search(uri) for uri in clean_wiki_uris])
+                lila_result = await asyncio.gather(*[lila_async_search(uri) for uri in clean_lila_uris])
+
+
+                logfire.info("Collecting results...")
+                for result in wikidata_result:  
+                    bindings = re.sub(result.uri, result.label, str(bindings))
+                for result in lila_result:
+                    bindings = re.sub(result.uri, result.heading, str(bindings))
+
+                lila_and_wiki_results = {
+                    "status": "success",
+                    "results": bindings
+                }
+                logfire.info("Returning results.")
+                return lila_and_wiki_results
 
             else:
                 logfire.info("Query was successful but no data was found")
@@ -127,6 +159,7 @@ def get_affixes(label: str, type: str):
     :type type: str
     """
     try:
+        logfire.info(f"Input affix in the tool: {label} of type {type}")
         with open("prefixes.json", "r") as f:
             prefixes = json.load(f)
         with open("suffixes.json", "r") as f:
@@ -136,8 +169,11 @@ def get_affixes(label: str, type: str):
             result = prefixes.get(label)
         elif type.lower() == "suffix":
             result = suffixes.get(label)
+        
+        logfire.info(f"Affixes tool result: {result}")
+        return result
+    
     except Exception as e:
         logfire.error(f"Exception caught in the get_affixes tool: {e}")
+        return None
     
-    logfire.info(f"Affixes tool result: {result}")
-    return result

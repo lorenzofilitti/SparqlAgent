@@ -1,7 +1,7 @@
 from programs.st_interface import chat_interface
 from pydantic_ai import Agent, Tool
 from programs.tools import DB_search, search_similarity, get_affixes
-from utilities.constants import SYSTEM_MESSAGE
+from src.utilities.constants import SYSTEM_MESSAGE, NEW_SYSTEM_PROMPT
 import os
 import logfire
 from dotenv import load_dotenv
@@ -53,7 +53,7 @@ def pyagent_chat(
 
 pyagent_chat(
     model=os.getenv("GPT-MODEL-NAME"),
-    system_prompt=SYSTEM_MESSAGE,
+    system_prompt=NEW_SYSTEM_PROMPT,
     tools=[Tool(DB_search), Tool(search_similarity), Tool(get_affixes)],
     model_settings={"temperature": 0,
                     "parallel_tool_calls": True
