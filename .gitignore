@@ -175,3 +175,4 @@ chroma_data/
 *.yaml
 
 .logfire
+.test/

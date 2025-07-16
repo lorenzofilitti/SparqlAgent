@@ -1,4 +1,5 @@
 import re
+import os
 from dotenv import load_dotenv
 import time
 from SPARQLWrapper import JSON, SPARQLWrapper2
@@ -7,9 +8,6 @@ import logfire
 import chromadb
 from chromadb.errors import ChromaError
 from src.programs.async_wikidata import wikidata_async_search, lila_async_search
-from src.utilities.constants import (
-    NUMBER_SIMILARITY_RESULTS, USER_QUERY_COLLECTION_NAME, SPARQL_QUERY_COLLECTION_NAME, LILA_ENDPOINT
-    )
 from typing import Dict, List
 from pydantic_ai.exceptions import ModelRetry
 from pydantic import BaseModel
@@ -51,7 +49,7 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
         :rtype: list[dict]
         """
         logfire.info(f"Input sparql query of the tool: {query}")
-        router = SPARQLWrapper2(LILA_ENDPOINT)
+        router = SPARQLWrapper2(os.environ.get("LILA_ENDPOINT"))
         router.setReturnFormat(JSON)
         
         try:
@@ -106,7 +104,7 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
             return {"status": "error", "error": str(e)}
         
 
-def search_similarity(query: str):
+def search_similarity(query: str, category: str):
     
     """ 
     Performs similarity search on the user queries vector db and
@@ -121,29 +119,28 @@ def search_similarity(query: str):
     """
     try:
         chroma_client = chromadb.HttpClient(host='localhost', port=8000)
-        u_query_collection = chroma_client.get_collection(name=USER_QUERY_COLLECTION_NAME)
-        s_query_collection = chroma_client.get_collection(name=SPARQL_QUERY_COLLECTION_NAME)
+        query_collection = chroma_client.get_collection(name=os.environ.get("USER_QUERY_COLLECTION_NAME"))
 
-        results_1 = u_query_collection.query(
-            query_texts=query,
-            n_results=NUMBER_SIMILARITY_RESULTS
-        )
-
-        ids_results_1 = results_1["ids"][0]
-
-        results_2 = s_query_collection.get(
-            ids = ids_results_1
-        ) 
-        logfire.info(f'Successfully performed semantic search: {results_2["documents"]}')
-        return {"result": "success", "content": results_2.get("documents")}
-    
+        query_results = query_collection.query(
+            query_texts=query, 
+            n_results=3,
+            where={"category": category}
+            )
+        
+        if query_results["ids"]:
+            sparql_queries = [
+                metadata["sparql_query"] for metadata in query_results["metadatas"][0]
+            ] 
+            logfire.info("Successfully performed semantic search")
+            return sparql_queries
+        
     except ChromaError as e:
-        logfire.error(f"An error occurred while performing semantic search: {e}")
-        return {"result": "error", "content": []}
+        logfire.error(f"ChromaDB error while performing semantic search: {e}")
+        return None
 
     except Exception as e:
         logfire.error(f"Unexpected error during semantic search. Error: {e}")
-        return {"result": "error", "content": []}
+        return None
 
 
 #--------------------------------------------------------------------
