@@ -103,46 +103,6 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
             logfire.error(f"Unexpected error occurred. Error: {e}")
             return {"status": "error", "error": str(e)}
         
-
-def search_similarity(query: str, category: str):
-    
-    """ 
-    Performs similarity search on the user queries vector db and
-    outputs the corresponding sparql query (based on matching ids)
-    from the sparql queries vector store.
-
-    :param query: The user question
-    :type query: str
-
-    :return: list of matching SPARQL queries based on similarity
-    :rtype: list
-    """
-    try:
-        chroma_client = chromadb.HttpClient(host='localhost', port=8000)
-        query_collection = chroma_client.get_collection(name=os.environ.get("USER_QUERY_COLLECTION_NAME"))
-
-        query_results = query_collection.query(
-            query_texts=query, 
-            n_results=3,
-            where={"category": category}
-            )
-        
-        if query_results["ids"]:
-            sparql_queries = [
-                metadata["sparql_query"] for metadata in query_results["metadatas"][0]
-            ] 
-            logfire.info("Successfully performed semantic search")
-            return sparql_queries
-        
-    except ChromaError as e:
-        logfire.error(f"ChromaDB error while performing semantic search: {e}")
-        return None
-
-    except Exception as e:
-        logfire.error(f"Unexpected error during semantic search. Error: {e}")
-        return None
-
-
 #--------------------------------------------------------------------
 
 def get_affixes(label: str, type: str):

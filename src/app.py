@@ -9,6 +9,7 @@ from yaml.loader import SafeLoader
 from pathlib import Path
 from src.response.agents import intent_extractor, main_agent, QuestionCategories
 from src.programs.tools import search_similarity
+from src.mongo.storage import run_vector_search
 
 load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
@@ -73,7 +74,7 @@ if user_query := st.chat_input("Ask something"):
     if intent.question_type != QuestionCategories.LILA_RELATED:
         pass
     else:
-        examples = search_similarity(query=user_query)
+        examples = run_vector_search(query=user_query)
         semantic_structure = intent.triples
         
         with st.chat_message("assistant"):
