@@ -5,12 +5,9 @@ import time
 from SPARQLWrapper import JSON, SPARQLWrapper2
 from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 import logfire
-import chromadb
-from chromadb.errors import ChromaError
 from src.programs.async_wikidata import wikidata_async_search, lila_async_search
 from typing import Dict, List
 from pydantic_ai.exceptions import ModelRetry
-from pydantic import BaseModel
 import json
 import asyncio
 load_dotenv()

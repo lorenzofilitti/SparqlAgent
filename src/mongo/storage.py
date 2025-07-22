@@ -15,7 +15,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-
 CLIENT = MongoClient(os.getenv("SERVER_URI"), server_api=ServerApi('1'))
 
 class MongoDocument(BaseModel):
@@ -75,7 +74,7 @@ def get_embeddings(data: list[list[str]] | str, precision="float32") -> list[flo
             with model.truncate_sentence_embeddings(truncate_dim=768):
                 for batch in data:
                     emb = model.encode(batch, precision=precision)
-                    embeddings.extend(emb.to_list())            
+                    embeddings.extend(emb.tolist())            
                 return embeddings
     except Exception as e:
         logging.error(f"Error while generating embeddings: {e}")
@@ -178,5 +177,9 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
         logging.info("MongoDB client connection closed.")
     
 
-
-
+if __name__=="__main__":
+    documents = prepare_docs_for_db()
+    batches = generate_batches(documents)
+    embeddings = get_embeddings(data=batches)
+    docs_with_emb = add_embeddings_to_docs(documents, embeddings)
+    update_collection(docs_with_emb)

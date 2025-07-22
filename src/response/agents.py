@@ -1,30 +1,17 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+
 from pydantic_ai import Tool, Agent
 from pydantic_ai.agent import AgentRunResult
 from pydantic_ai.messages import ModelMessage
-from pydantic import BaseModel
-from enum import Enum
 from typing import Optional
-import os
 
 from src.utilities.prompts import MAIN_SYSTEM_PROMPT, INTENT_PROMPT
 from src.programs.tools import DB_search, get_affixes
-
-class QuestionCategories(Enum):
-    LILA_RELATED = "lila_related" 
-    GENERAL_INQUIRY = "general_inquiry" 
-
-class Triple(BaseModel):
-    subject: str
-    property: str
-    object: str
-
-class Metadata(BaseModel):
-    language: str
-    triples: list[Triple]
-    question_type: QuestionCategories
+from src.response.dataclasses import Metadata
 
 def intent_extractor(user_question: str, previous_exchange: list) -> Metadata:
-
     agent = Agent(
         model = os.environ.get("GPT-MODEL-NAME"),
         system_prompt = INTENT_PROMPT,

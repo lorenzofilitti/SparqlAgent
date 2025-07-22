@@ -1,15 +1,23 @@
+import sys
+import os
+
+current_dir = os.path.dirname(os.path.abspath(__file__)) # -> /path/to/my_project/src
+project_root = os.path.dirname(current_dir)             # -> /path/to/my_project
+
+if project_root not in sys.path:
+    sys.path.append(project_root)
+
 import streamlit as st
 from dotenv import load_dotenv
 from streamlit_authenticator import Authenticate
-from programs.tools import gen
 import logfire
-import os
 import yaml
 from yaml.loader import SafeLoader
 from pathlib import Path
-from src.response.agents import intent_extractor, main_agent, QuestionCategories
-from src.programs.tools import search_similarity
+from src.response.agents import intent_extractor, main_agent
 from src.mongo.storage import run_vector_search
+from src.programs.tools import gen
+from src.response.dataclasses import QuestionType
 
 load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
@@ -70,11 +78,14 @@ if user_query := st.chat_input("Ask something"):
         user_question=user_query, 
         previous_exchange=st.session_state.messages
         )
+    
+    question_language = intent.language
+    question_category = intent.category
 
-    if intent.question_type != QuestionCategories.LILA_RELATED:
+    if intent.question_type != QuestionType.LILA_RELATED:
         pass
     else:
-        examples = run_vector_search(query=user_query)
+        examples = run_vector_search(question=user_query, category=question_category)
         semantic_structure = intent.triples
         
         with st.chat_message("assistant"):
