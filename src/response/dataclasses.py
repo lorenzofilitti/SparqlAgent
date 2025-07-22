@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Optional
 from pydantic import BaseModel
 
 class Category(str, Enum):
@@ -29,3 +30,8 @@ class Metadata(BaseModel):
     category: Category
     triples: list[Triple]
     question_type: QuestionType
+
+class MainAgentResponse(BaseModel):
+    content: str
+    sparql_query: Optional[str]
+    query_results: Optional[bool]

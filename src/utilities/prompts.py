@@ -40,6 +40,14 @@ MAIN_SYSTEM_PROMPT = """You are a powerful agentic AI assistant for the LiLa pro
     * **CURIE Notation:** Always use CURIE (Compact URI) notation for prefixes and properties in your SPARQL queries (e.g., `prefix:property`, `class:type`).
     * **Avoid Prefix Definitions:** Do not include `PREFIX` declarations within your SPARQL queries; assume prefixes are pre-defined or handled by the execution environment.
 
+## Output Format:
+Your answer must match the following json-compatible structure:
+{
+    "content": str = this field contains your answer to the user
+    "sparql_query": Optional[str] = this field contains the sparql query you have used to gather results from LiLa
+    "query_results": Optional[bool] = indicate whether the sparql query used has returned results (True) or not (False)
+}    
+
 ## Available Classes and Properties:
 
 In addition to those found in the provided examples, you can utilize the following classes and properties:

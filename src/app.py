@@ -1,8 +1,8 @@
 import sys
 import os
 
-current_dir = os.path.dirname(os.path.abspath(__file__)) # -> /path/to/my_project/src
-project_root = os.path.dirname(current_dir)             # -> /path/to/my_project
+current_dir = os.path.dirname(os.path.abspath(__file__)) 
+project_root = os.path.dirname(current_dir)             
 
 if project_root not in sys.path:
     sys.path.append(project_root)
@@ -15,7 +15,7 @@ import yaml
 from yaml.loader import SafeLoader
 from pathlib import Path
 from src.response.agents import intent_extractor, main_agent
-from src.mongo.storage import run_vector_search
+from src.mongo.storage import run_vector_search, save_agent_queries
 from src.programs.tools import gen
 from src.response.dataclasses import QuestionType
 
@@ -46,8 +46,6 @@ if "authenticator" not in st.session_state:
 )
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "memory" not in st.session_state:
-    st.session_state.memory = {}
 
 
 authenticator: Authenticate = st.session_state.authenticator
@@ -92,28 +90,33 @@ if user_query := st.chat_input("Ask something"):
             with st.spinner("Thinking..."):
 
                 try:
-                    history = st.session_state.memory.get("content")
-                    if not history:
-                        response = main_agent(
-                            user_question=user_query, 
-                            sparql_queries=examples,
-                            semantic_structure=semantic_structure,
-                            message_history=None
+                    history = {}
+                    response = main_agent(
+                        user_question=user_query, 
+                        sparql_queries=examples,
+                        semantic_structure=semantic_structure,
+                        message_history=history
+                        )
+                        
+                    if response.content is not None: 
+                        st.write_stream(gen(response.content))
+
+                        if response.sparql_query is not None:
+                            save_agent_queries(
+                                user_query=user_query,
+                                sparql_query=response.sparql_query,
+                                query_results=response.query_results,
+                                agent_response=response.content
                             )
                     else:
-                        response = main_agent(
-                            user_question=user_query,
-                            sparql_queries=examples,
-                            semantic_structure=semantic_structure,
-                            message_history=history
-                            ) 
-                    
-                    if response.data is not None:
-                        st.write_stream(gen(response.data))
-                    else:
                         st.warning("Response is None")
-                    st.session_state.memory.update({"content": response.new_messages()})
-                    st.session_state.messages.append({"role": "assistant", "content": response.data})
+                    st.session_state.messages.append({"role": "assistant", "content": response.content})
+                    history.update(
+                        {
+                            "User": user_query,
+                            "Your answer": response.content
+                        }
+                    )
 
                 except Exception as e:
                     logfire.error(f"An error occurred during the chat: {e}")

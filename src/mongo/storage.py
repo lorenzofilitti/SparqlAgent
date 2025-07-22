@@ -172,10 +172,23 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
     except Exception as e:
         logging.error(f"Error during vector search: {e}")
         return None
-    finally:
-        CLIENT.close()
-        logging.info("MongoDB client connection closed.")
+    # finally:
+    #     CLIENT.close()
+    #     logging.info("MongoDB client connection closed.")
     
+def save_agent_queries(user_query: str, sparql_query: str, query_results: bool, agent_response: str):
+    try: 
+        collection = CLIENT.get_database("QueriesDatabase").get_collection("AgentQueries")
+        document = {
+            "user_query": user_query,
+            "sparql_query": sparql_query,
+            "has_returned_results": query_results,
+            "agent_response": agent_response
+        }
+        collection.insert_one(document)
+    except Exception as e:
+        logging.error(f"Error while saving query results: {e}")
+
 
 if __name__=="__main__":
     documents = prepare_docs_for_db()
