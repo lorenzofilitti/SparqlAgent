@@ -98,10 +98,10 @@ if user_query := st.chat_input("Ask something"):
                         message_history=history
                         )
                         
-                    if response.content is not None: 
+                    if response.content: 
                         st.write_stream(gen(response.content))
 
-                        if response.sparql_query is not None:
+                        if response.sparql_query:
                             save_agent_queries(
                                 user_query=user_query,
                                 sparql_query=response.sparql_query,
