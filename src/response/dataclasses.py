@@ -12,26 +12,21 @@ class Category(str, Enum):
     AFFIX = "affix"
     VERB = "verb"
     ETYMOLOGY = "etymology"
-    INFLECTION = "etymology"
+    INFLECTION = "inflection"
     SYNSET = "synset"
     ADVERB = "adverb"
 
 class QuestionType(Enum):
-    LILA_RELATED = "lila_related" 
-    GENERAL_INQUIRY = "general_inquiry" 
-
-class Triple(BaseModel):
-    subject: str
-    property: str
-    object: str
+    LILA_RELATED = "lila_related"
+    GENERAL_INQUIRY = "general_inquiry"
 
 class Metadata(BaseModel):
     language: str
+    reformulated_question: str
     category: Category
-    triples: list[Triple]
     question_type: QuestionType
 
 class MainAgentResponse(BaseModel):
     content: str
     sparql_query: Optional[str]
-    query_results: Optional[bool]
+    query_results: bool

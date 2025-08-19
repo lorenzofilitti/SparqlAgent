@@ -4,12 +4,14 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 import logging
 from pydantic import BaseModel
-
+from openai import OpenAI
 import os
 import re
 from typing import Optional
 from dotenv import load_dotenv
+
 load_dotenv()
+openai_client = OpenAI()
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -39,12 +41,12 @@ def prepare_docs_for_db() -> list[MongoDocument]:
             docs.append(
                 MongoDocument(
                     category = row["category"],
-                    user_query = user_query, 
+                    user_query = user_query,
                     sparql_query = s_query,
                     text_embedding = None
                 )
             )
-            
+
         logging.info(f"{len(docs)} documents collected.")
         return docs
     except Exception as e:
@@ -63,24 +65,21 @@ def generate_batches(docs: list[MongoDocument]) -> list[list[str]]:
 
 
 def get_embeddings(data: list[list[str]] | str, precision="float32") -> list[float] | list[list[float]]:
-    model = SentenceTransformer("nomic-ai/nomic-embed-text-v1", trust_remote_code=True)
     embeddings = []
     try:
         if isinstance(data, str):
-            with model.truncate_sentence_embeddings(truncate_dim=768):
-                emb = model.encode(data, precision=precision)
-                return emb.tolist()
+            emb = openai_client.embeddings.create(input=data, model="text-embedding-3-small")
+            return emb.data[0].embedding
         else:
-            with model.truncate_sentence_embeddings(truncate_dim=768):
-                for batch in data:
-                    emb = model.encode(batch, precision=precision)
-                    embeddings.extend(emb.tolist())            
-                return embeddings
+            for batch in data:
+                emb = openai_client.embeddings.create(input=batch, model="text-embedding-3-small")
+                embeddings.extend(emb.data[0].embedding)
+            return embeddings
     except Exception as e:
         logging.error(f"Error while generating embeddings: {e}")
 
 
-def add_embeddings_to_docs(docs: list[MongoDocument], embedding_list: list) -> list[MongoDocument]:
+def add_embeddings_to_docs(docs: list[MongoDocument], embedding_list: list) -> Optional[list[MongoDocument]]:
     documents_with_emb = []
     try:
         if not docs:
@@ -89,7 +88,7 @@ def add_embeddings_to_docs(docs: list[MongoDocument], embedding_list: list) -> l
         if not embedding_list:
             logging.info("Empty embedding list")
             return None
-        
+
         for doc, embedding in zip(docs, embedding_list):
             document = MongoDocument(
                 category = doc.category,
@@ -98,12 +97,12 @@ def add_embeddings_to_docs(docs: list[MongoDocument], embedding_list: list) -> l
                 text_embedding = embedding
             )
             documents_with_emb.append(document)
-        
+
         return documents_with_emb
     except Exception as e:
         logging.error(f"Error while creating embeddings: {e}", exc_info=True)
         return []
-            
+
 
 def update_collection(docs: list[MongoDocument]) -> None:
     query_collection = CLIENT.get_database("QueriesDatabase").get_collection("Queries")
@@ -111,9 +110,9 @@ def update_collection(docs: list[MongoDocument]) -> None:
         if not docs:
             logging.info("Empty docs list")
             return None
-        
+
         for doc in docs:
-            query_filter = { 
+            query_filter = {
                     "category": doc.category,
                     "user_query": doc.user_query,
                     "sparql_query": doc.sparql_query,
@@ -175,9 +174,9 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
     # finally:
     #     CLIENT.close()
     #     logging.info("MongoDB client connection closed.")
-    
+
 def save_agent_queries(user_query: str, sparql_query: str, query_results: bool, agent_response: str):
-    try: 
+    try:
         collection = CLIENT.get_database("QueriesDatabase").get_collection("AgentQueries")
         document = {
             "user_query": user_query,

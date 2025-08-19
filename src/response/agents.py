@@ -7,7 +7,8 @@ from typing import Optional
 
 from src.utilities.prompts import MAIN_SYSTEM_PROMPT, INTENT_PROMPT
 from src.programs.tools import DB_search, get_affixes
-from src.response.dataclasses import Metadata, MainAgentResponse
+from src.programs.parser import explore_concept
+from src.response.dataclasses import Metadata, MainAgentResponse, Triple
 
 def intent_extractor(user_question: str, previous_exchange: list) -> Metadata:
     agent = Agent(
@@ -21,16 +22,15 @@ def intent_extractor(user_question: str, previous_exchange: list) -> Metadata:
     return intent_response.data
 
 def main_agent(
-        user_question: str,
-        sparql_queries: list[str],
-        semantic_structure: list[dict], 
-        message_history: Optional[dict] = None) -> MainAgentResponse:
-    
+    user_question: str,
+    sparql_queries: Optional[list[dict]],
+    message_history: Optional[dict] = None) -> MainAgentResponse:
+
     agent = Agent(
         model = os.getenv("GPT-MODEL-NAME"),
         system_prompt = MAIN_SYSTEM_PROMPT,
         instrument = True,
-        tools = [Tool(DB_search), Tool(get_affixes)],
+        tools = [Tool(DB_search), Tool(explore_concept), Tool(get_affixes)],
         result_type=MainAgentResponse,
         model_settings = {
             "temperature": 0,
@@ -45,6 +45,3 @@ def main_agent(
         message_history=message_history
     )
     return response.data
-
-
-

@@ -1,12 +1,12 @@
 from enum import Enum
 from typing import Optional
 import os
-import logging
+import logfire
 from dataclasses import dataclass
 from SPARQLWrapper import JSON, SPARQLWrapper2
 from dotenv import load_dotenv
 load_dotenv()
-logging.basicConfig(level=logging.INFO)
+logfire.configure(token=os.environ.get("LOGFIRE_TOKEN"), service_name="SparqlAgent")
 
 class OntologyElement(Enum):
     CLASS = "class"
@@ -27,7 +27,18 @@ class Concept():
     sub_class: Optional[URI]
     _type: OntologyElement
 
-class LilaDatabaseParser:
+    def to_string_for_llm(self) -> str:
+        string = f"""
+         Element Type: {self._type}
+         URI: {self.uri}
+         Label: {self.label}
+         Description: {self.description}
+         Parent Class: {self.parent_class}
+         Sub Class: {self.sub_class}
+        """
+        return string
+
+class LilaDatabaseParser():
     def __init__(self):
         self.endpoint = os.environ.get("LILA_ENDPOINT", "")
         self.classes: dict[str, Concept] = {}
@@ -39,22 +50,29 @@ class LilaDatabaseParser:
 
     def _build_indexes(self) -> None:
         self.classes = self._extract_classes()
-        logging.info(f"Extracted {len(self.classes)} classes")
+        logfire.info(f"Extracted {len(self.classes)} classes")
         self.properties = self._extract_properties()
-        logging.info(f"Extracted {len(self.properties)} properties")
+        logfire.info(f"Extracted {len(self.properties)} properties")
 #        self.individuals = self._extract_named_individuals()
-#        logging.info(f"Extracted {len(self.individuals)} individuals")
+#        logfire.info(f"Extracted {len(self.individuals)} individuals")
         self.identifier_uri_mapping = self._create_identifier_id_mapping()
 
     def _extract_classes(self) -> dict[str, Concept]:
         query = """
-        SELECT ?class ?label ?comment ?parentClass ?label_2 WHERE {
-                ?class a owl:Class .
-                OPTIONAL { ?class rdfs:label ?label }
-                OPTIONAL { ?class rdfs:comment ?comment }
-                optional {?class rdfs:subClassOf ?parentClass;
-                                rdfs:label ?label_2}}
-            """
+        SELECT ?class ?label ?comment ?subclass ?parentClass ?label_2 ?label_sub WHERE {
+            ?class a owl:Class .
+            OPTIONAL { ?class rdfs:label ?label }
+            OPTIONAL { ?class rdfs:comment ?comment }
+            OPTIONAL {
+                ?class rdfs:subClassOf ?parentClass .
+                ?parentClass rdfs:label ?label_2
+            }
+            OPTIONAL {
+                ?subclass rdfs:subClassOf ?class .
+                ?subclass rdfs:label ?label_sub
+            }
+        }
+        """
         router = SPARQLWrapper2(self.endpoint)
         router.setQuery(query)
         router.setReturnFormat(JSON)
@@ -69,6 +87,8 @@ class LilaDatabaseParser:
                 description = result.get("comment")
                 parent_class = result.get("parentClass")
                 pc_label = result.get("label_2")
+                subclass = result.get("subclass")
+                sc_label = result.get("label_sub")
 
                 final_results[uri] = Concept(
                     uri = uri,
@@ -78,19 +98,29 @@ class LilaDatabaseParser:
                         uri = parent_class.get("value") if parent_class else None,
                         label = pc_label.get("value") if pc_label else None
                     ),
-                    sub_class=None,
+                    sub_class= URI(
+                        uri = subclass.get("value") if subclass else None,
+                        label = sc_label.get("value") if sc_label else None
+                    ),
                     _type = OntologyElement.CLASS
                 )
         return final_results
 
     def _extract_properties(self) -> dict[str, Concept]:
         query = """
-        SELECT ?property ?label ?comment ?parentProperty ?label_2 WHERE {
-          ?property a rdf:Property .
-          OPTIONAL { ?property rdfs:label ?label }
-          OPTIONAL { ?property rdfs:comment ?comment }
-          optional {?property rdfs:subPropertyOf ?parentProperty;
-                           rdfs:label ?label_2}}
+        SELECT ?property ?label ?comment ?subproperty ?parentProperty ?label_2 ?label_sub WHERE {
+            ?property a rdf:Property .
+            OPTIONAL { ?property rdfs:label ?label }
+            OPTIONAL { ?property rdfs:comment ?comment }
+            OPTIONAL {
+                ?property rdfs:subPropertyOf ?parentProperty .
+                ?parentProperty rdfs:label ?label_2
+            }
+            OPTIONAL {
+                ?subclass rdfs:subPropertyOf ?class .
+                ?subclass rdfs:label ?label_sub
+            }
+        }
         """
         router = SPARQLWrapper2(self.endpoint)
         router.setQuery(query)
@@ -107,6 +137,8 @@ class LilaDatabaseParser:
                 description = result.get("comment")
                 parent_prop = result.get("parentProperty")
                 pp_label = result.get("label_2")
+                sub_prop = result.get("subproperty")
+                sp_label = result.get("label_sub")
 
                 final_results[uri] = Concept(
                         uri = uri,
@@ -116,7 +148,10 @@ class LilaDatabaseParser:
                             uri = parent_prop.get("value")if parent_prop else None,
                             label = pp_label.get("value")if pp_label else None
                         ),
-                        sub_class=None,
+                        sub_class= URI(
+                            uri = sub_prop.get("value")if sub_prop else None,
+                            label = sp_label.get("value")if sp_label else None
+                        ),
                         _type = OntologyElement.PROPERTY
                     )
         return final_results
@@ -179,17 +214,19 @@ class LilaDatabaseParser:
             return None
 
 
-def explore_concept(database_parser: LilaDatabaseParser, identifier: Optional[str] = None):
+def explore_concept(identifier: Optional[str] = None) -> Optional[str]:
+    database_parser = LilaDatabaseParser()
+    logfire.info(f"Exploring concept with identifier: {identifier}")
     if identifier:
         concept = database_parser.find_concept(identifier)
         if concept:
-            return concept
+            return concept.to_string_for_llm()
         else:
             uri = database_parser.map_identifier_to_uri(identifier)
             concept = database_parser.find_concept(uri)
             if concept:
-                return concept
+                return concept.to_string_for_llm()
             else:
-                logging.info(f"Concept not found for URI: {uri}")
+                logfire.info(f"Concept not found for URI: {uri}")
     else:
         print("No identifier provided")

@@ -13,7 +13,7 @@ import asyncio
 load_dotenv()
 
 #------------------------------------------------------------------------------------------
-     
+
 def clean_query(sprql_query):
     """
     Takes the sparql query from gpt and removes the word "sparql"
@@ -34,11 +34,11 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
-async def DB_search(query: str) -> List[Dict[str, str]]:
+async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
         """
-        Use this tool exclusively to send a sparql query and get results 
+        Use this tool exclusively to send a sparql query and get results
         from the Lila Knowledge base
-        
+
         :param query: a query formatted in sparql language
         :type query: str
 
@@ -48,7 +48,7 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
         logfire.info(f"Input sparql query of the tool: {query}")
         router = SPARQLWrapper2(os.environ.get("LILA_ENDPOINT"))
         router.setReturnFormat(JSON)
-        
+
         try:
             router.setQuery(clean_query(query))
             query_result = router.query()
@@ -61,23 +61,23 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
 
                 logfire.info("Extracting uris...")
                 wiki_pattern = re.compile(r"https?://www\.wikidata.*?\'")
-                lila_pattern = re.compile(r"https?://lila-erc\.eu.*?\'")
+                #lila_pattern = re.compile(r"https?://lila-erc\.eu.*?\'")
 
                 wikidata_uris = wiki_pattern.findall(str(bindings))
-                lila_uris = lila_pattern.findall(str(bindings))
+                #lila_uris = lila_pattern.findall(str(bindings))
                 clean_wiki_uris = [re.sub("'", "", uri) for uri in wikidata_uris]
-                clean_lila_uris = [re.sub("'", "", uri) for uri in lila_uris]
+                #clean_lila_uris = [re.sub("'", "", uri) for uri in lila_uris]
 
                 logfire.info("Searching Wikidata and LiLa...")
                 wikidata_result = await asyncio.gather(*[wikidata_async_search(uri) for uri in clean_wiki_uris])
-                lila_result = await asyncio.gather(*[lila_async_search(uri) for uri in clean_lila_uris])
+                #lila_result = await asyncio.gather(*[lila_async_search(uri) for uri in clean_lila_uris])
 
 
                 logfire.info("Collecting results...")
-                for result in wikidata_result:  
+                for result in wikidata_result:
                     bindings = re.sub(result.uri, result.label, str(bindings))
-                for result in lila_result:
-                    bindings = re.sub(result.uri, result.heading, str(bindings))
+                #for result in lila_result:
+                #    bindings = re.sub(result.uri, result.heading, str(bindings))
 
                 lila_and_wiki_results = {
                     "status": "success",
@@ -91,15 +91,15 @@ async def DB_search(query: str) -> List[Dict[str, str]]:
                 return {"status": "success",
                         "message": "No data found in the database",
                         "results": []}
-            
+
         except QueryBadFormed as e:
             logfire.error(f"Query bad formatted. Error: {e}")
-            raise ModelRetry({"status": "error", "error": str(e)}) 
+            raise ModelRetry("""{"status": "error", "error": str(e)}""")
 
         except Exception as e:
             logfire.error(f"Unexpected error occurred. Error: {e}")
             return {"status": "error", "error": str(e)}
-        
+
 #--------------------------------------------------------------------
 
 def get_affixes(label: str, type: str):
@@ -118,16 +118,15 @@ def get_affixes(label: str, type: str):
             prefixes = json.load(f)
         with open("suffixes.json", "r") as f:
             suffixes = json.load(f)
-        
+
         if type.lower() == "prefix":
             result = prefixes.get(label)
         elif type.lower() == "suffix":
             result = suffixes.get(label)
-        
+
         logfire.info(f"Affixes tool result: {result}")
         return result
-    
+
     except Exception as e:
         logfire.error(f"Exception caught in the get_affixes tool: {e}")
         return None
-    

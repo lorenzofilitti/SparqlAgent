@@ -1,6 +1,7 @@
 import asyncio
 import os
 import requests
+from typing import Optional
 from pydantic import BaseModel
 import logfire
 from bs4 import BeautifulSoup
@@ -10,10 +11,10 @@ load_dotenv()
 logfire.configure(token=os.environ.get("LOGFIRE-TOKEN"))
 
 class WikidataResults(BaseModel):
-    uri        : str | None = None
-    entity_id  : str | None = None
-    label      : str | None = None
-    description: str | None = None
+    uri        : Optional[str] = None
+    entity_id  : Optional[str] = None
+    label      : Optional[str] = None
+    description: Optional[str] = None
 
 
 def wikidata_sync_search(uri: str) -> WikidataResults | None:
@@ -32,21 +33,21 @@ def wikidata_sync_search(uri: str) -> WikidataResults | None:
     except requests.exceptions.Timeout:
         logfire.error(f"Timeout during Wikidata request for URI: {uri}")
         return None
-    
+
     except requests.exceptions.ConnectionError:
         logfire.error(f"Connection error to Wikidata for URI: {uri}")
         return None
-    
+
     except Exception as e:
         logfire.error(f"Unexpected error during Wikidata request: {e}")
         return None
 
-#----------------------------------------------------------------------------------------------------------------------
+#------------------------------------------------------------------------------------------------------------
 
 class LilaResults(BaseModel):
-    uri     : str = None
-    heading : str = None
-    
+    uri     : Optional[str] = None
+    heading : Optional[str] = None
+
 def lila_sync_search(uri: str) -> LilaResults | None:
 
     try:
@@ -64,11 +65,11 @@ def lila_sync_search(uri: str) -> LilaResults | None:
     except requests.exceptions.Timeout:
         logfire.error(f"Timeout during LiLa request for URI: {uri}")
         return None
-    
+
     except requests.exceptions.ConnectionError:
         logfire.error(f"Connection error to LiLa for URI: {uri}")
         return None
-    
+
     except Exception as e:
         logfire.error(f"Unexpected error during LiLa request: {e}")
         return None
@@ -79,6 +80,3 @@ async def wikidata_async_search(uri:str):
 
 async def lila_async_search(uri:str):
     return await asyncio.to_thread(lila_sync_search, uri)
-
-
-
