@@ -64,21 +64,17 @@ async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
                 #lila_pattern = re.compile(r"https?://lila-erc\.eu.*?\'")
 
                 wikidata_uris = wiki_pattern.findall(str(bindings))
-                #lila_uris = lila_pattern.findall(str(bindings))
-                clean_wiki_uris = [re.sub("'", "", uri) for uri in wikidata_uris]
-                #clean_lila_uris = [re.sub("'", "", uri) for uri in lila_uris]
 
-                logfire.info("Searching Wikidata and LiLa...")
-                wikidata_result = await asyncio.gather(*[wikidata_async_search(uri) for uri in clean_wiki_uris])
-                #lila_result = await asyncio.gather(*[lila_async_search(uri) for uri in clean_lila_uris])
+                if wikidata_uris:
+                    clean_wiki_uris = [re.sub("'", "", uri) for uri in wikidata_uris]
 
+                    logfire.info("Searching Wikidata...")
+                    wikidata_result = await asyncio.gather(*[wikidata_async_search(uri) for uri in clean_wiki_uris])
 
-                logfire.info("Collecting results...")
-                for result in wikidata_result:
-                    bindings = re.sub(result.uri, result.label, str(bindings))
-                #for result in lila_result:
-                #    bindings = re.sub(result.uri, result.heading, str(bindings))
-
+                    logfire.info("Collecting results...")
+                    for result in wikidata_result:
+                        bindings = re.sub(result.uri, result.label, str(bindings))
+                
                 lila_and_wiki_results = {
                     "status": "success",
                     "results": bindings
@@ -94,7 +90,7 @@ async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
 
         except QueryBadFormed as e:
             logfire.error(f"Query bad formatted. Error: {e}")
-            raise ModelRetry("""{"status": "error", "error": str(e)}""")
+            raise ModelRetry({"status": "error", "error": str(e)})
 
         except Exception as e:
             logfire.error(f"Unexpected error occurred. Error: {e}")
@@ -114,9 +110,9 @@ def get_affixes(label: str, type: str):
     """
     try:
         logfire.info(f"Input affix in the tool: {label} of type {type}")
-        with open("prefixes.json", "r") as f:
+        with open(".test/prefixes.json", "r") as f:
             prefixes = json.load(f)
-        with open("suffixes.json", "r") as f:
+        with open(".test/suffixes.json", "r") as f:
             suffixes = json.load(f)
 
         if type.lower() == "prefix":

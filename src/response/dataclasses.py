@@ -20,13 +20,15 @@ class QuestionType(Enum):
     LILA_RELATED = "lila_related"
     GENERAL_INQUIRY = "general_inquiry"
 
-class Metadata(BaseModel):
+class Intent(BaseModel):
     language: str
-    reformulated_question: str
-    category: Category
+    category: Optional[Category]
     question_type: QuestionType
 
 class MainAgentResponse(BaseModel):
     content: str
     sparql_query: Optional[str]
     query_results: bool
+
+class ReformulatedQuery(BaseModel):
+    reformulated_query: str

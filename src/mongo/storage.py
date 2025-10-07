@@ -1,14 +1,16 @@
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-from sentence_transformers import SentenceTransformer
-import pandas as pd
 import logging
-from pydantic import BaseModel
-from openai import OpenAI
 import os
 import re
+import time
 from typing import Optional
+
+import pandas as pd
 from dotenv import load_dotenv
+from openai import OpenAI
+from pydantic import BaseModel
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from pymongo.errors import ServerSelectionTimeoutError
 
 load_dotenv()
 openai_client = OpenAI()
@@ -68,12 +70,13 @@ def get_embeddings(data: list[list[str]] | str, precision="float32") -> list[flo
     embeddings = []
     try:
         if isinstance(data, str):
-            emb = openai_client.embeddings.create(input=data, model="text-embedding-3-small")
+            emb = openai_client.embeddings.create(input=data, model="text-embedding-3-small", dimensions=768)
             return emb.data[0].embedding
         else:
             for batch in data:
-                emb = openai_client.embeddings.create(input=batch, model="text-embedding-3-small")
-                embeddings.extend(emb.data[0].embedding)
+                emb = openai_client.embeddings.create(input=batch, model="text-embedding-3-small", dimensions=768)
+                for item in emb.data:
+                    embeddings.append(item.embedding)
             return embeddings
     except Exception as e:
         logging.error(f"Error while generating embeddings: {e}")
@@ -128,8 +131,8 @@ def update_collection(docs: list[MongoDocument]) -> None:
                         "text_embedding": doc.text_embedding
                     }
                     }
-                update_result = query_collection.update_one(filter=query_filter, update=update_operation)
-                logging.info(f"Found document with id '{update_result.upserted_id}'. Document has been updated.")
+                query_collection.update_one(filter=query_filter, update=update_operation)
+                logging.info(f"Found document with id '{document['_id']}'. Document has been updated.")
 
             else:
                 insert_result = query_collection.insert_one(doc.model_dump())
@@ -144,19 +147,21 @@ def update_collection(docs: list[MongoDocument]) -> None:
 def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
     query_collection = CLIENT.get_database("QueriesDatabase").get_collection("Queries")
     try:
+        _emb_start = time.time()
         embedded_query = get_embeddings(data=question)
+        logging.info(f"Question embedding took: {time.time() - _emb_start} seconds")
 
-        query = {
+        query = [{
             "$vectorSearch": {
                 "exact": True,
                 "filter": {"category": category},
                 "index": "SparqlIndex",
                 "limit": 5,
                 "path": "text_embedding",
-                "queryVector": embedded_query[0]
+                "queryVector": embedded_query
             }
-        }
-
+        }]
+        
         query_results = query_collection.aggregate(query)
         filtered_query_results = [
             {
@@ -168,6 +173,9 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
             for res in query_results
         ]
         return filtered_query_results
+    except ServerSelectionTimeoutError as e:
+        logging.error(f"Mongo Server Timeout error (check if IP is valid): {e}")
+        raise e
     except Exception as e:
         logging.error(f"Error during vector search: {e}")
         return None

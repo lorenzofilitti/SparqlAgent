@@ -14,17 +14,14 @@ class OntologyElement(Enum):
     INDIVIDUAL = "individual"
 
 @dataclass
-class URI():
-    uri: Optional[str]
-    label: Optional[str]
-
-@dataclass
 class Concept():
     uri: Optional[str]
     label: Optional[str]
     description: Optional[str]
-    parent_class: Optional[URI]
-    sub_class: Optional[URI]
+    parent_classes: Optional[list[str]]
+    sub_classes: Optional[list[str]]
+    parent_properties: Optional[list[str]]
+    sub_properties: Optional[list[str]]
     _type: OntologyElement
 
     def to_string_for_llm(self) -> str:
@@ -33,8 +30,8 @@ class Concept():
          URI: {self.uri}
          Label: {self.label}
          Description: {self.description}
-         Parent Class: {self.parent_class}
-         Sub Class: {self.sub_class}
+         Parent Classes: {self.parent_classes}
+         Sub Classes: {self.sub_classes}
         """
         return string
 
@@ -45,8 +42,20 @@ class LilaDatabaseParser():
         self.properties: dict[str, Concept] = {}
         self.individuals: dict[str, Concept] = {}
         self.identifier_uri_mapping: dict[str, str] = {}
+        self.identifier_uri_non_unique: list[tuple[str, Concept]] = []
 
         self._build_indexes()
+
+    @staticmethod
+    def extract_label_from_uri(uri: str) -> Optional[str]:
+        try:
+            label = os.path.basename(uri) 
+            label = label.split("#")
+            label = label[1] if len(label) == 2 else None
+        except ValueError as e:
+            label = None
+
+        return label
 
     def _build_indexes(self) -> None:
         self.classes = self._extract_classes()
@@ -59,101 +68,149 @@ class LilaDatabaseParser():
 
     def _extract_classes(self) -> dict[str, Concept]:
         query = """
-        SELECT ?class ?label ?comment ?subclass ?parentClass ?label_2 ?label_sub WHERE {
-            ?class a owl:Class .
-            OPTIONAL { ?class rdfs:label ?label }
-            OPTIONAL { ?class rdfs:comment ?comment }
-            OPTIONAL {
-                ?class rdfs:subClassOf ?parentClass .
-                ?parentClass rdfs:label ?label_2
-            }
-            OPTIONAL {
-                ?subclass rdfs:subClassOf ?class .
-                ?subclass rdfs:label ?label_sub
-            }
+        SELECT
+          ?class
+          ?label
+          ?description
+          (GROUP_CONCAT(DISTINCT ?parentClass; SEPARATOR=", ") AS ?parent_classes)
+          (GROUP_CONCAT(DISTINCT ?subClass; SEPARATOR=", ") AS ?sub_classes)
+        WHERE {
+          ?class a owl:Class .
+          OPTIONAL { ?class rdfs:label ?label }
+          OPTIONAL { ?class rdfs:comment ?description }
+
+          OPTIONAL {
+            ?class rdfs:subClassOf ?pc.
+            ?pc rdfs:label ?parentClass
+          }
+
+          OPTIONAL {
+            ?sc rdfs:subClassOf ?class ;
+                  rdfs:label ?subClass
+          }
         }
+        GROUP BY ?class ?label ?description
+        ORDER BY ?class
+        limit 2000
         """
         router = SPARQLWrapper2(self.endpoint)
         router.setQuery(query)
         router.setReturnFormat(JSON)
-        query_result = router.query().fullResult
+        query_result = router.query()
 
-        bindings = query_result["results"]["bindings"]
         final_results = {}
-        if bindings:
-            for result in bindings:
-                uri = result.get("class").get("value", None)
-                label = os.path.basename(uri)
-                description = result.get("comment")
-                parent_class = result.get("parentClass")
-                pc_label = result.get("label_2")
-                subclass = result.get("subclass")
-                sc_label = result.get("label_sub")
+        if query_result:
+            for result in query_result.bindings:
+                uri = result.get("class")
+                label = result.get("label")
+                description = result.get("description")
+                parent_classes = result.get("parent_classes")
+                sub_classes = result.get("sub_classes")
 
-                final_results[uri] = Concept(
-                    uri = uri,
-                    label = label if label else None,
-                    description=description.get("value") if description else None,
-                    parent_class= URI(
-                        uri = parent_class.get("value") if parent_class else None,
-                        label = pc_label.get("value") if pc_label else None
-                    ),
-                    sub_class= URI(
-                        uri = subclass.get("value") if subclass else None,
-                        label = sc_label.get("value") if sc_label else None
-                    ),
+                concept = Concept(
+                    uri = uri.value if uri else None,
+                    label = label.value if label else self.extract_label_from_uri(uri.value),
+                    description=description.value if description else None,
+                    parent_classes= parent_classes.value.split(", ") if parent_classes else None,
+                    sub_classes= sub_classes.value.split(", ") if sub_classes else None,
+                    parent_properties= None,
+                    sub_properties= None,
                     _type = OntologyElement.CLASS
                 )
+                uri_string = uri.value if uri else ""
+                if uri_string in final_results:
+                    description = description.value if description else None
+                    existing_concept = final_results[uri_string]
+                    concept_merge = Concept(
+                        uri = concept.uri,
+                        label = concept.label,
+                        description=f"{existing_concept.description} {description}",
+                        parent_classes= concept.parent_classes,
+                        sub_classes= concept.sub_classes,
+                        parent_properties= None,
+                        sub_properties= None,
+                        _type = OntologyElement.CLASS
+                    )
+                    final_results[uri_string] = concept_merge
+                else:
+                    final_results[uri_string] = concept
+                    self.identifier_uri_non_unique.append((uri_string, concept))
         return final_results
 
     def _extract_properties(self) -> dict[str, Concept]:
         query = """
-        SELECT ?property ?label ?comment ?subproperty ?parentProperty ?label_2 ?label_sub WHERE {
-            ?property a rdf:Property .
-            OPTIONAL { ?property rdfs:label ?label }
-            OPTIONAL { ?property rdfs:comment ?comment }
-            OPTIONAL {
-                ?property rdfs:subPropertyOf ?parentProperty .
-                ?parentProperty rdfs:label ?label_2
-            }
-            OPTIONAL {
-                ?subclass rdfs:subPropertyOf ?class .
-                ?subclass rdfs:label ?label_sub
-            }
+        SELECT
+          ?property
+          ?label
+          ?description
+          (GROUP_CONCAT(DISTINCT ?parentProperty; SEPARATOR=", ") AS ?parent_properties)
+          (GROUP_CONCAT(DISTINCT ?subProperty; SEPARATOR=", ") AS ?sub_properties)
+        WHERE {
+          # Classe principale
+          ?property a rdf:Property .
+          OPTIONAL { ?property rdfs:label ?label }
+          OPTIONAL { ?property rdfs:comment ?description }
+
+          # Parent classes (opzionali)
+          OPTIONAL {
+            ?property rdfs:subPropertyOf ?pc.
+            ?pc rdfs:label ?parentProperty
+          }
+
+          # Sub classes (opzionali)
+          OPTIONAL {
+            ?sc rdfs:subPropertyOf ?property ;
+                  rdfs:label ?subProperty
+          }
         }
+        GROUP BY ?property ?label ?description
+        ORDER BY ?property
+        limit 2000
         """
         router = SPARQLWrapper2(self.endpoint)
         router.setQuery(query)
         router.setReturnFormat(JSON)
-        query_result = router.query().fullResult
-
-        bindings = query_result["results"]["bindings"]
+        query_result = router.query()
 
         final_results = {}
-        if bindings:
-            for result in bindings:
-                uri = result.get("property").get("value", None)
-                label = os.path.basename(uri)
+        if query_result:
+            for result in query_result.bindings:
+                uri = result.get("property")
+                label = result.get("label")
                 description = result.get("comment")
-                parent_prop = result.get("parentProperty")
-                pp_label = result.get("label_2")
-                sub_prop = result.get("subproperty")
-                sp_label = result.get("label_sub")
+                parent_properties = result.get("parentProperties")
+                sub_properties = result.get("subproperties")
 
-                final_results[uri] = Concept(
-                        uri = uri,
-                        label = label if label else None,
-                        description=description.get("value") if description else None,
-                        parent_class= URI(
-                            uri = parent_prop.get("value")if parent_prop else None,
-                            label = pp_label.get("value")if pp_label else None
-                        ),
-                        sub_class= URI(
-                            uri = sub_prop.get("value")if sub_prop else None,
-                            label = sp_label.get("value")if sp_label else None
-                        ),
+                concept = Concept(
+                    uri = uri.value if uri else None,
+                    label = label.value if label else self.extract_label_from_uri(uri.value),
+                    description= description.value if description else None,
+                    parent_classes = None,
+                    sub_classes = None,
+                    parent_properties= parent_properties.value.split(", ") if parent_properties else None,
+                    sub_properties= sub_properties.value.split(", ") if sub_properties else None,
+                    _type = OntologyElement.PROPERTY
+                )
+                uri_string = uri.value if uri else ""
+                if uri_string in final_results:
+                    description = description.value if description else None
+                    existing_concept = final_results[uri_string]
+                    concept_merge = Concept(
+                        uri = concept.uri,
+                        label = concept.label,
+                        description=f"{existing_concept.description} {description}",
+                        parent_classes= None,
+                        sub_classes= None,
+                        parent_properties= concept.parent_properties,
+                        sub_properties= concept.sub_properties,
                         _type = OntologyElement.PROPERTY
                     )
+                    final_results[uri_string] = concept_merge
+                else:
+                    final_results[uri_string] = concept
+                    self.identifier_uri_non_unique.append((uri_string, concept))
+                final_results[uri_string] = concept
+                self.identifier_uri_non_unique.append((uri_string, concept))
         return final_results
 
     def _extract_named_individuals(self) -> dict[str, Concept]:
@@ -179,8 +236,10 @@ class LilaDatabaseParser():
                             uri = uri,
                             label = label if label else None,
                             description= None,
-                            parent_class= None,
-                            sub_class=None,
+                            parent_classes= None,
+                            sub_classes=None,
+                            parent_properties=None,
+                            sub_properties=None,
                             _type = OntologyElement.INDIVIDUAL
                         )
         return final_results
@@ -213,9 +272,9 @@ class LilaDatabaseParser():
         else:
             return None
 
-
-def explore_concept(identifier: Optional[str] = None) -> Optional[str]:
-    database_parser = LilaDatabaseParser()
+database_parser = LilaDatabaseParser()
+def explore_concept(identifier: str, database_parser = database_parser) -> Optional[str]:
+    identifier = identifier.split(":")[1]
     logfire.info(f"Exploring concept with identifier: {identifier}")
     if identifier:
         concept = database_parser.find_concept(identifier)

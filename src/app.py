@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -7,17 +7,20 @@ project_root = os.path.dirname(current_dir)
 if project_root not in sys.path:
     sys.path.append(project_root)
 
+from pathlib import Path
+
+import logfire
 import streamlit as st
+import yaml
 from dotenv import load_dotenv
 from streamlit_authenticator import Authenticate
-import logfire
-import yaml
 from yaml.loader import SafeLoader
-from pathlib import Path
-from src.response.agents import intent_extractor, main_agent
+
 from src.mongo.storage import run_vector_search, save_agent_queries
 from src.programs.tools import gen
+from src.response.agents import intent_extractor, main_agent, query_reformulator
 from src.response.dataclasses import QuestionType
+from src.conversation.conversation import format_conversation_history
 
 load_dotenv()
 logfire.configure(token=os.getenv("LOGFIRE-TOKEN"))
@@ -46,6 +49,8 @@ if "authenticator" not in st.session_state:
 )
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
 
 
 authenticator: Authenticate = st.session_state.authenticator
@@ -70,18 +75,25 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+
+
 if user_query := st.chat_input("Ask something"):
     st.session_state.messages.append({"role": "user", "content": user_query})
     st.chat_message("user").markdown(user_query)
 
-    intent = intent_extractor(
+    reformulated_query = query_reformulator(
         user_question=user_query,
-        previous_exchange=st.session_state.messages
+        conversation_history=st.session_state.conversation_history
+    )
+    logfire.info(f"Reformatted question: {reformulated_query.reformulated_query}")
+
+    intent = intent_extractor(
+        user_question=reformulated_query.reformulated_query,
         )
+    logfire.info(f"Intent: {intent.model_dump()}")
 
     question_language = intent.language
     question_category = intent.category
-    reformulated_question = intent.reformulated_question
 
     if intent.question_type != QuestionType.LILA_RELATED:
         examples = []
@@ -92,32 +104,37 @@ if user_query := st.chat_input("Ask something"):
         with st.spinner("Thinking..."):
 
             try:
-                history = {}
                 response = main_agent(
-                    user_question=reformulated_question,
+                    user_question=reformulated_query,
                     sparql_queries=examples,
-                    message_history=history
+                    conversation_history=st.session_state.conversation_history
                     )
 
-                if response.content:
-                    st.write_stream(gen(response.content))
+                if response.data.content:
+                    st.write_stream(gen(response.data.content))
 
-                    if response.sparql_query:
+                    with st.expander("Sparql query used:"):
+                        st.code(response.data.sparql_query, language="sparql")
+
+                    if response.data.sparql_query:
                         save_agent_queries(
-                            user_query=reformulated_question,
-                            sparql_query=response.sparql_query,
-                            query_results=response.query_results,
-                            agent_response=response.content
+                            user_query=reformulated_query.reformulated_query,
+                            sparql_query=response.data.sparql_query,
+                            query_results=response.data.query_results,
+                            agent_response=response.data.content
                         )
                 else:
                     st.warning("Response is None")
-                st.session_state.messages.append({"role": "assistant", "content": response.content})
-                history.update(
-                    {
-                        "User": user_query,
-                        "Your answer": response.content
-                    }
+
+                st.session_state.messages.append({"role": "assistant", "content": response.data.content})
+                formatted_exchange = format_conversation_history(
+                    user_message=user_query,
+                    assistant_message=response.data.content
                 )
+                st.session_state.conversation_history.extend(formatted_exchange)
+
+                if len(st.session_state.conversation_history) == 3:
+                    st.session_state.conversation_history.pop(0)
 
             except Exception as e:
                 logfire.error(f"An error occurred during the chat: {e}")
