@@ -1,15 +1,19 @@
-import re
+import asyncio
+import json
 import os
-from dotenv import load_dotenv
+import re
 import time
+from typing import Dict, List, Optional
+
+import logfire
+from dotenv import load_dotenv
+from pydantic_ai.exceptions import ModelRetry
 from SPARQLWrapper import JSON, SPARQLWrapper2
 from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
-import logfire
-from src.programs.async_wikidata import wikidata_async_search, lila_async_search
-from typing import Dict, List
-from pydantic_ai.exceptions import ModelRetry
-import json
-import asyncio
+from SPARQLWrapper.SmartWrapper import Bindings
+
+from src.programs.async_wikidata import lila_async_search, wikidata_async_search
+
 load_dotenv()
 
 #------------------------------------------------------------------------------------------
@@ -34,7 +38,7 @@ def gen(txt):
 
 #------------------------------------------------------------------------------------------
 
-async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
+async def DB_search(query: str) -> Optional[List[Dict[str, str]] | Dict]:
         """
         Use this tool exclusively to send a sparql query and get results
         from the Lila Knowledge base
@@ -53,7 +57,7 @@ async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
             router.setQuery(clean_query(query))
             query_result = router.query()
 
-            if query_result.bindings:
+            if isinstance(query_result, Bindings) and query_result.bindings:
                 logfire.info("Found results from the lila db")
 
                 full_result = query_result.fullResult
@@ -90,7 +94,7 @@ async def DB_search(query: str) -> List[Dict[str, str]] | Dict:
 
         except QueryBadFormed as e:
             logfire.error(f"Query bad formatted. Error: {e}")
-            raise ModelRetry({"status": "error", "error": str(e)})
+            raise ModelRetry(str(e))
 
         except Exception as e:
             logfire.error(f"Unexpected error occurred. Error: {e}")
@@ -117,7 +121,7 @@ def get_affixes(label: str, type: str):
 
         if type.lower() == "prefix":
             result = prefixes.get(label)
-        elif type.lower() == "suffix":
+        else: 
             result = suffixes.get(label)
 
         logfire.info(f"Affixes tool result: {result}")

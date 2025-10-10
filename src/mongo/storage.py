@@ -144,6 +144,7 @@ def update_collection(docs: list[MongoDocument]) -> None:
         CLIENT.close()
         logging.info("MongoDB client connection closed.")
 
+
 def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
     query_collection = CLIENT.get_database("QueriesDatabase").get_collection("Queries")
     try:
@@ -192,7 +193,8 @@ def save_agent_queries(user_query: str, sparql_query: str, query_results: bool, 
             "has_returned_results": query_results,
             "agent_response": agent_response
         }
-        collection.insert_one(document)
+        insert_result = collection.insert_one(document)
+        logging.info(f"Added successfull query to MongoDB: id = '{insert_result.inserted_id}'")
     except Exception as e:
         logging.error(f"Error while saving query results: {e}")
 
