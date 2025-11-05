@@ -18,25 +18,23 @@ class WikidataResults(BaseModel):
 
 
 def wikidata_sync_search(uri: str) -> WikidataResults | None:
+    endpoint = "https://www.wikidata.org/w/rest.php/wikibase/v1"
+    headers = {
+        "User-Agent": os.getenv("USER_AGENT")
+    }
 
     try:
-        wikidata_query_results = requests.get(uri, timeout=5).json()
-        entity = list(wikidata_query_results.get("entities", "").keys())[0]
+        target_entity = os.path.basename(uri)
+        label = requests.get(f"{endpoint}/entities/items/{target_entity}/labels", headers=headers).json().get("en", None)
+        description = requests.get(f"{endpoint}/entities/items/{target_entity}/descriptions", headers=headers).json().get("en", None)
 
         results = WikidataResults(
             uri         = uri,
-            entity_id   = entity,
-            label       = wikidata_query_results.get("entities", "").get(entity, "").get("labels", "").get("en", "").get("value", ""),
-            description = wikidata_query_results.get("entities", "").get(entity, "").get("descriptions", "").get("en", "").get("value", ""),
+            entity_id   = target_entity,
+            label       = label,
+            description = description,
         )
         return results
-    except requests.exceptions.Timeout:
-        logfire.error(f"Timeout during Wikidata request for URI: {uri}")
-        return None
-
-    except requests.exceptions.ConnectionError:
-        logfire.error(f"Connection error to Wikidata for URI: {uri}")
-        return None
 
     except Exception as e:
         logfire.error(f"Unexpected error during Wikidata request: {e}")
@@ -62,13 +60,6 @@ def lila_sync_search(uri: str) -> LilaResults | None:
             heading = heading_txt
         )
         return results
-    except requests.exceptions.Timeout:
-        logfire.error(f"Timeout during LiLa request for URI: {uri}")
-        return None
-
-    except requests.exceptions.ConnectionError:
-        logfire.error(f"Connection error to LiLa for URI: {uri}")
-        return None
 
     except Exception as e:
         logfire.error(f"Unexpected error during LiLa request: {e}")

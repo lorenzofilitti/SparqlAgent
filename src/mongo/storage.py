@@ -27,8 +27,28 @@ class MongoDocument(BaseModel):
     sparql_query: str
     text_embedding: Optional[list[float]]
 
+
+def check_doc_exists(
+    category: str,
+    user_query: str,
+    sparql_query: str
+) -> bool:
+    query_collection = CLIENT.get_database("QueriesDatabase").get_collection("Queries")
+    query_filter = {
+            "category": category,
+            "user_query": user_query,
+            "sparql_query": sparql_query,
+        }
+    document = query_collection.find_one(query_filter)
+    if document:
+        return True
+    else:
+        return False
+
+
 def prepare_docs_for_db() -> list[MongoDocument]:
-    file_path = os.path.abspath("querySparql.xlsx")
+    file_path = os.path.abspath("./SparqlAgent/querySparql.xlsx")
+    file_path = os.path.abspath("/Users/lorenzofilitti/Desktop/SparqlAgent/querySparql.xlsx")
     df = pd.read_excel(file_path, sheet_name="Foglio1")
 
     try:
@@ -40,14 +60,15 @@ def prepare_docs_for_db() -> list[MongoDocument]:
             s_query = re.sub("\n", " ", row["sparql_query"])
             s_query = re.sub("\t", " ", s_query)
 
-            docs.append(
-                MongoDocument(
-                    category = row["category"],
-                    user_query = user_query,
-                    sparql_query = s_query,
-                    text_embedding = None
+            if not check_doc_exists(row["category"], user_query, s_query):
+                docs.append(
+                    MongoDocument(
+                        category = row["category"],
+                        user_query = user_query,
+                        sparql_query = s_query,
+                        text_embedding = None
+                    )
                 )
-            )
 
         logging.info(f"{len(docs)} documents collected.")
         return docs
@@ -57,30 +78,36 @@ def prepare_docs_for_db() -> list[MongoDocument]:
 
 
 def generate_batches(docs: list[MongoDocument]) -> list[list[str]]:
-    batch_size = 10
-    contents = [doc.user_query for doc in docs]
-    batches = []
+    if docs:
+        batch_size = 10
+        contents = [doc.user_query for doc in docs]
+        batches = []
 
-    for i in range(0, len(contents), batch_size):
-        batches.append(contents[i:i+batch_size])
-    return batches
+        for i in range(0, len(contents), batch_size):
+            batches.append(contents[i:i+batch_size])
+        return batches
+    else:
+        return []
 
 
-def get_embeddings(data: list[list[str]] | str, precision="float32") -> list[float] | list[list[float]]:
+def get_embeddings(data: list[list[str]] | str) -> list[float] | list[list[float]]:
     embeddings = []
     try:
         if isinstance(data, str):
             emb = openai_client.embeddings.create(input=data, model="text-embedding-3-small", dimensions=768)
             return emb.data[0].embedding
         else:
-            for batch in data:
-                emb = openai_client.embeddings.create(input=batch, model="text-embedding-3-small", dimensions=768)
-                for item in emb.data:
-                    embeddings.append(item.embedding)
-            return embeddings
+            if data:
+                for batch in data:
+                    emb = openai_client.embeddings.create(input=batch, model="text-embedding-3-small", dimensions=768)
+                    for item in emb.data:
+                        embeddings.append(item.embedding)
+                return embeddings
+            else:
+                return []
     except Exception as e:
         logging.error(f"Error while generating embeddings: {e}")
-
+        return []
 
 def add_embeddings_to_docs(docs: list[MongoDocument], embedding_list: list) -> Optional[list[MongoDocument]]:
     documents_with_emb = []
@@ -145,7 +172,7 @@ def update_collection(docs: list[MongoDocument]) -> None:
         logging.info("MongoDB client connection closed.")
 
 
-def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
+def run_vector_search(question: str, category: str) -> Optional[list[str]]:
     query_collection = CLIENT.get_database("QueriesDatabase").get_collection("Queries")
     try:
         _emb_start = time.time()
@@ -165,12 +192,7 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
         
         query_results = query_collection.aggregate(query)
         filtered_query_results = [
-            {
-                "_id": res["_id"],
-                "category": res["category"],
-                "user_query": res["user_query"],
-                "sparql_query": res ["sparql_query"]
-            }
+            f""" 'question': {res["user_query"]}"\n'sparql_query': {res["sparql_query"]} """
             for res in query_results
         ]
         return filtered_query_results
@@ -180,9 +202,7 @@ def run_vector_search(question: str, category: str) -> Optional[list[dict]]:
     except Exception as e:
         logging.error(f"Error during vector search: {e}")
         return None
-    # finally:
-    #     CLIENT.close()
-    #     logging.info("MongoDB client connection closed.")
+
 
 def save_agent_queries(user_query: str, sparql_query: str, query_results: bool, agent_response: str):
     try:
@@ -194,14 +214,15 @@ def save_agent_queries(user_query: str, sparql_query: str, query_results: bool, 
             "agent_response": agent_response
         }
         insert_result = collection.insert_one(document)
-        logging.info(f"Added successfull query to MongoDB: id = '{insert_result.inserted_id}'")
+        logging.info(f"Added successful query to MongoDB: id = '{insert_result.inserted_id}'")
     except Exception as e:
         logging.error(f"Error while saving query results: {e}")
 
 
 if __name__=="__main__":
     documents = prepare_docs_for_db()
-    batches = generate_batches(documents)
-    embeddings = get_embeddings(data=batches)
+    doc_batches = generate_batches(documents)
+    embeddings = get_embeddings(data=doc_batches)
     docs_with_emb = add_embeddings_to_docs(documents, embeddings)
-    update_collection(docs_with_emb)
+    if docs_with_emb:
+        update_collection(docs_with_emb)

@@ -19,7 +19,7 @@ from yaml.loader import SafeLoader
 from src.mongo.storage import run_vector_search, save_agent_queries
 from src.programs.tools import gen
 from src.response.agents import intent_extractor, main_agent, query_reformulator
-from src.response.dataclasses import QuestionType
+from src.response.dataclses import QuestionType
 from src.conversation.conversation import format_conversation_history
 
 load_dotenv()
@@ -105,7 +105,7 @@ if user_query := st.chat_input("Ask something"):
 
             try:
                 response = main_agent(
-                    user_question=reformulated_query,
+                    user_question=reformulated_query.reformulated_query,
                     sparql_queries=examples,
                     conversation_history=st.session_state.conversation_history
                     )
@@ -116,7 +116,7 @@ if user_query := st.chat_input("Ask something"):
                     with st.expander("Sparql query used:"):
                         st.code(response.data.sparql_query, language="sparql")
 
-                    if response.data.sparql_query:
+                    if response.data.sparql_query and response.data.query_results:
                         save_agent_queries(
                             user_query=reformulated_query.reformulated_query,
                             sparql_query=response.data.sparql_query,

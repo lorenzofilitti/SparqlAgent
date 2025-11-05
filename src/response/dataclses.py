@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class Category(str, Enum):
     DOCUMENT = "document"
@@ -32,3 +32,8 @@ class MainAgentResponse(BaseModel):
 
 class ReformulatedQuery(BaseModel):
     reformulated_query: str
+
+class Evaluation(BaseModel):
+    explanation: str = Field(description="Detailed explanation of issues and fixes")
+    is_valid: bool = Field(description="True if query is correct, False if issues found"),
+    corrected_query: Optional[str] = Field(description="Fixed query if issues found, null otherwise"),  
