@@ -170,9 +170,18 @@ Your output must be a JSON object with three keys:
         "question_type": "LILA_RELATED",
         }`
              
+**Example 4: user_query on Documents**
+
+* user_query: `List 5 plays by Dante`
+* **Expected Output**
+    `{
+        "language": "en",
+        "category": "document", 
+        "question_type": "LILA_RELATED",
+        }`
 
 
-**Example 4: user_query on affixes**
+**Example 5: user_query on affixes**
 
 * user_query: `Show me a Lemma starting with the prefix sub-?`
 * **Expected Output**
