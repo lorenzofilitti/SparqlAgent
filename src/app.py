@@ -13,7 +13,6 @@ import logfire
 import streamlit as st
 import yaml
 from dotenv import load_dotenv
-from streamlit_authenticator import Authenticate
 from yaml.loader import SafeLoader
 
 from src.mongo.storage import run_vector_search, save_agent_queries
@@ -39,32 +38,11 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
     )
 
-if "authenticator" not in st.session_state:
-    st.session_state.authenticator = Authenticate(
-        credentials= config["credentials"],
-        cookie_name= config["cookie"]["name"],
-        cookie_key= config["cookie"]["key"],
-        cookie_expiry_days= config["cookie"]["expiry_days"],
 
-)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
-
-
-authenticator: Authenticate = st.session_state.authenticator
-authenticator.login("main")
-
-if st.session_state.get("authentication_status") is None:
-        st.warning("Please enter username and password")
-
-elif st.session_state.get("authentication_status") is False:
-    st.error("Username or password is incorrect")
-
-elif st.session_state.get("authentication_status"):
-    logfire.info("User logged in")
-    authenticator.logout(location="sidebar")
 
 
 st.markdown("# LiLa Virtual Assistant 🤖", unsafe_allow_html=True)
@@ -81,24 +59,28 @@ if user_query := st.chat_input("Ask something"):
     st.session_state.messages.append({"role": "user", "content": user_query})
     st.chat_message("user").markdown(user_query)
 
-    reformulated_query = query_reformulator(
-        user_question=user_query,
-        conversation_history=st.session_state.conversation_history
-    )
-    logfire.info(f"Reformatted question: {reformulated_query.reformulated_query}")
-
-    intent = intent_extractor(
-        user_question=reformulated_query.reformulated_query,
+    try:
+        reformulated_query = query_reformulator(
+            user_question=user_query,
+            conversation_history=st.session_state.conversation_history
         )
-    logfire.info(f"Intent: {intent.model_dump()}")
+        logfire.info(f"Reformatted question: {reformulated_query.reformulated_query}")
 
-    question_language = intent.language
-    question_category = intent.category
+        intent = intent_extractor(
+            user_question=reformulated_query.reformulated_query,
+            )
+        logfire.info(f"Intent: {intent.model_dump()}")
 
-    if intent.question_type != QuestionType.LILA_RELATED:
-        examples = []
-    else:
-        examples = run_vector_search(question=user_query, category=question_category)
+        question_language = intent.language
+        question_category = intent.category
+
+        if intent.question_type != QuestionType.LILA_RELATED:
+            examples = []
+        else:
+            examples = run_vector_search(question=user_query, category=question_category)
+    except Exception as e:
+        st.write("I apologize, I can't help you with this request.")
+        raise
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):

@@ -49,6 +49,7 @@ async def DB_search(query: str) -> Optional[List[Dict[str, str]] | Dict | str]:
         :return: Results of the query from the knowledge base in json format
         :rtype: list[dict]
         """
+        logfire.info(f"Input sparql query of the tool: {query}")
         parser = LilaDatabaseParser()
         router = SPARQLWrapper2(os.environ.get("LILA_ENDPOINT"))
         router.setReturnFormat(JSON)

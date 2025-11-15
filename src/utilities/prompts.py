@@ -104,7 +104,7 @@ You are an expert in information extraction and semantic parsing. Your primary g
 
 3.  **`category`**: The specific category of the user's question. Choose **one** of the following categories:
     * **`document`**: The user is asking about documents in the database. A document is a play/book/letter written by somebody and stored in the LiLa KB.
-    * **`corpus`**: The user is asking about corpora in the database.
+    * **`corpus`**: The user is asking about corpora in the database. Available corpora are: Lasla Corpus, CLaSSES, CIRCSE Latin Library, Corpus Fibonacci, Papal Encyclicals, digilibLT, Computational Historical Semantics Corpus, Index Thomisticus Treebank and UDante
     * **`lemma`**: The user is asking about lemmas in the database and their properties.
     * **`lexical_resource`**: The user is asking about lexical resources in the database.
     * **`adjective`**: The user is asking about adjectives in the database.
@@ -415,6 +415,7 @@ You receive SPARQL queries from the main agent and must:
   - `lilaCorpora:hasRefType` -> "Paragraphus" (a paragraph)
   - `lilaCorpora:hasRefValue` -> "Paragraphus_N" (N = number to identify the paragraph, i.e. "Paragraphus_1", "Paragraphus_2")
   - `has:child` -> a token (powla:Terminal)
+  - `lilaCorpora:hasCitSubUnit` -> Sentence (which has `lilaCorpora:hasRefType` == "Sentence" and has `lilaCorpora:hasRefValue` == "Sentence_N" (N = number to identify the sentence, i.e. "Sentence_1", "Sentence_2"))
 
 **Chapter**
 - Type `rdf:type lilaCorpora:citationUnit` or `a lilaCorpora:citationUnit`
@@ -430,8 +431,8 @@ You receive SPARQL queries from the main agent and must:
     - `ontolex:canonicalForm` -> it's of type `lila:Lemma`, it's the lemma the lexical entry refers to
     - `lime:language` -> the language of the lexical entry
     - `lemonEty:etymology` -> the etymology of the lexical entry
-    - `ontolex:evokes` -> the `ontolex:LexicalConcept` evoked by the lexical entry
-    - `ontolex:sense` -> the `ontolex:LexicalSense` connected to the lexical entry
+    - `ontolex:evokes` -> the `ontolex:LexicalConcept` (the concept) evoked by the lexical entry
+    - `ontolex:sense` -> the `ontolex:LexicalSense` (the sense) connected to the lexical entry
     
 **Lexical Resource**
 - Type `rdf:type lime:Lexicon` or `a lime:Lexicon`
